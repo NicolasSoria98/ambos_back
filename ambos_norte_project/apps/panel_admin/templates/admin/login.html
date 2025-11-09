@@ -1,0 +1,157 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+    body {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    #content {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        padding: 40px;
+        max-width: 400px;
+        width: 100%;
+    }
+    
+    .login-header {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+    
+    .login-header h1 {
+        color: #667eea;
+        font-size: 2rem;
+        margin-bottom: 5px;
+    }
+    
+    .login-header p {
+        color: #6b7280;
+        font-size: 0.875rem;
+    }
+    
+    #login-form {
+        margin: 0;
+    }
+    
+    .form-row {
+        margin-bottom: 20px;
+    }
+    
+    .form-row label {
+        display: block;
+        margin-bottom: 8px;
+        color: #374151;
+        font-weight: 500;
+    }
+    
+    .form-row input[type="text"],
+    .form-row input[type="password"] {
+        width: 100%;
+        padding: 12px;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 1rem;
+        transition: all 0.2s ease;
+    }
+    
+    .form-row input[type="text"]:focus,
+    .form-row input[type="password"]:focus {
+        border-color: #667eea;
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    
+    .submit-row {
+        margin-top: 30px;
+        text-align: center;
+    }
+    
+    .submit-row input[type="submit"] {
+        width: 100%;
+        padding: 14px;
+        font-size: 1rem;
+        border-radius: 8px;
+        cursor: pointer;
+    }
+    
+    .errornote {
+        background: #fee2e2;
+        border-left: 4px solid #ef4444;
+        color: #991b1b;
+        padding: 12px;
+        border-radius: 6px;
+        margin-bottom: 20px;
+    }
+    
+    #header, #footer, .breadcrumbs {
+        display: none;
+    }
+</style>
+{% endblock %}
+
+{% block bodyclass %}{{ block.super }} login{% endblock %}
+
+{% block usertools %}{% endblock %}
+
+{% block nav-global %}{% endblock %}
+
+{% block content_title %}{% endblock %}
+
+{% block content %}
+<div class="login-header">
+    <svg class="w-16 h-16 mx-auto mb-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
+    </svg>
+    <h1>Ambos Norte</h1>
+    <p>Panel de Administración</p>
+</div>
+
+{% if form.errors and not form.non_field_errors %}
+<p class="errornote">
+    {% if form.errors.items|length == 1 %}
+        Por favor corrige el error a continuación.
+    {% else %}
+        Por favor corrige los errores a continuación.
+    {% endif %}
+</p>
+{% endif %}
+
+{% if form.non_field_errors %}
+    {% for error in form.non_field_errors %}
+        <p class="errornote">{{ error }}</p>
+    {% endfor %}
+{% endif %}
+
+<form action="{{ app_path }}" method="post" id="login-form">
+    {% csrf_token %}
+    
+    <div class="form-row">
+        {{ form.username.label_tag }}
+        {{ form.username }}
+        {% if form.username.errors %}
+            <div class="text-red-600 text-sm mt-1">{{ form.username.errors }}</div>
+        {% endif %}
+    </div>
+    
+    <div class="form-row">
+        {{ form.password.label_tag }}
+        {{ form.password }}
+        {% if form.password.errors %}
+            <div class="text-red-600 text-sm mt-1">{{ form.password.errors }}</div>
+        {% endif %}
+        <input type="hidden" name="next" value="{{ next }}">
+    </div>
+    
+    <div class="submit-row">
+        <input type="submit" value="{% translate 'Log in' %}">
+    </div>
+</form>
+{% endblock %}

@@ -1,0 +1,307 @@
+{% extends 'panel_admin/base.html' %}
+
+{% block title %}Análisis de Ventas - Ambos Norte{% endblock %}
+
+{% block content %}
+<div class="px-4 py-6 sm:px-0">
+    <!-- Header con selector de período -->
+    <div class="mb-8 flex justify-between items-center">
+        <div>
+            <h2 class="text-3xl font-bold text-gray-900">Análisis de Ventas</h2>
+            <p class="mt-1 text-sm text-gray-600">
+                Análisis detallado del desempeño de ventas
+            </p>
+        </div>
+        <div>
+            <form method="get" class="flex items-center space-x-2">
+                <label for="dias" class="text-sm font-medium text-gray-700">Período:</label>
+                <select name="dias" id="dias" onchange="this.form.submit()" class="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    <option value="7" {% if dias_seleccionados == 7 %}selected{% endif %}>Últimos 7 días</option>
+                    <option value="30" {% if dias_seleccionados == 30 %}selected{% endif %}>Últimos 30 días</option>
+                    <option value="90" {% if dias_seleccionados == 90 %}selected{% endif %}>Últimos 90 días</option>
+                    <option value="365" {% if dias_seleccionados == 365 %}selected{% endif %}>Último año</option>
+                </select>
+            </form>
+        </div>
+    </div>
+
+    <!-- Métricas del Período -->
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+        <div class="bg-gradient-to-br from-indigo-500 to-indigo-600 overflow-hidden shadow-lg rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-dollar-sign text-white text-3xl"></i>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-indigo-100 truncate">
+                                Ventas Totales
+                            </dt>
+                            <dd class="text-2xl font-bold text-white">
+                                ${{ metricas_periodo.total_ventas|floatformat:0|default:"0" }}
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-gradient-to-br from-green-500 to-green-600 overflow-hidden shadow-lg rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-shopping-bag text-white text-3xl"></i>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-green-100 truncate">
+                                Total Pedidos
+                            </dt>
+                            <dd class="text-2xl font-bold text-white">
+                                {{ metricas_periodo.total_pedidos|default:"0" }}
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-gradient-to-br from-purple-500 to-purple-600 overflow-hidden shadow-lg rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-receipt text-white text-3xl"></i>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-purple-100 truncate">
+                                Ticket Promedio
+                            </dt>
+                            <dd class="text-2xl font-bold text-white">
+                                ${{ metricas_periodo.promedio_ticket|floatformat:0|default:"0" }}
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-gradient-to-br from-orange-500 to-orange-600 overflow-hidden shadow-lg rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-box text-white text-3xl"></i>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-orange-100 truncate">
+                                Productos Vendidos
+                            </dt>
+                            <dd class="text-2xl font-bold text-white">
+                                {{ metricas_periodo.total_productos|default:"0" }}
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gráfico de Tendencias -->
+    <div class="bg-white shadow-lg rounded-lg p-6 mb-8">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">
+            <i class="fas fa-chart-area text-indigo-500 mr-2"></i>
+            Tendencia de Ventas
+        </h3>
+        <div style="height: 400px;">
+            <canvas id="tendenciasChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Ventas por Categoría y Embudo -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <!-- Ventas por Categoría -->
+        <div class="bg-white shadow-lg rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                <i class="fas fa-tags text-green-500 mr-2"></i>
+                Ventas por Categoría
+            </h3>
+            <div class="space-y-4">
+                {% for categoria in ventas_categoria %}
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-sm font-medium text-gray-700">{{ categoria.nombre }}</span>
+                        <span class="text-sm font-semibold text-gray-900">${{ categoria.ingresos|floatformat:0|default:"0" }}</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2.5">
+                        {% widthratio categoria.ingresos metricas_periodo.total_ventas 100 as porcentaje %}
+                        <div class="bg-green-500 h-2.5 rounded-full" style="width: {{ porcentaje }}%"></div>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">{{ categoria.total_vendido|default:"0" }} unidades vendidas</p>
+                </div>
+                {% empty %}
+                <p class="text-sm text-gray-500 text-center py-4">No hay datos de ventas</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Embudo de Conversión -->
+        <div class="bg-white shadow-lg rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                <i class="fas fa-filter text-purple-500 mr-2"></i>
+                Embudo de Conversión
+            </h3>
+            <div class="space-y-6">
+                <!-- Vistas -->
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-sm font-medium text-gray-700">
+                            <i class="fas fa-eye text-blue-500 mr-2"></i>Vistas de Producto
+                        </span>
+                        <span class="text-lg font-bold text-gray-900">{{ embudo.vistas }}</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-3">
+                        <div class="bg-blue-500 h-3 rounded-full" style="width: 100%"></div>
+                    </div>
+                </div>
+
+                <!-- Agregados al Carrito -->
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-sm font-medium text-gray-700">
+                            <i class="fas fa-shopping-cart text-green-500 mr-2"></i>Agregados al Carrito
+                        </span>
+                        <span class="text-lg font-bold text-gray-900">{{ embudo.agregados_carrito }}</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-3">
+                        {% widthratio embudo.agregados_carrito embudo.vistas 100 as porcentaje %}
+                        <div class="bg-green-500 h-3 rounded-full" style="width: {{ porcentaje }}%"></div>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">Tasa: {{ embudo.tasa_vista_carrito|floatformat:1 }}%</p>
+                </div>
+
+                <!-- Checkouts -->
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-sm font-medium text-gray-700">
+                            <i class="fas fa-credit-card text-yellow-500 mr-2"></i>Inicio de Checkout
+                        </span>
+                        <span class="text-lg font-bold text-gray-900">{{ embudo.checkouts }}</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-3">
+                        {% widthratio embudo.checkouts embudo.vistas 100 as porcentaje %}
+                        <div class="bg-yellow-500 h-3 rounded-full" style="width: {{ porcentaje }}%"></div>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">Tasa: {{ embudo.tasa_carrito_checkout|floatformat:1 }}%</p>
+                </div>
+
+                <!-- Compras -->
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-sm font-medium text-gray-700">
+                            <i class="fas fa-check-circle text-indigo-500 mr-2"></i>Compras Completadas
+                        </span>
+                        <span class="text-lg font-bold text-gray-900">{{ embudo.compras }}</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-3">
+                        {% widthratio embudo.compras embudo.vistas 100 as porcentaje %}
+                        <div class="bg-indigo-500 h-3 rounded-full" style="width: {{ porcentaje }}%"></div>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">Tasa: {{ embudo.tasa_checkout_compra|floatformat:1 }}%</p>
+                </div>
+
+                <!-- Conversión Total -->
+                <div class="mt-6 pt-6 border-t border-gray-200">
+                    <div class="flex justify-between items-center">
+                        <span class="text-base font-semibold text-gray-900">Conversión Total</span>
+                        <span class="text-2xl font-bold text-indigo-600">{{ embudo.tasa_conversion_total|floatformat:1 }}%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Gráfico de Tendencias
+const tendenciasCtx = document.getElementById('tendenciasChart');
+if (tendenciasCtx) {
+    new Chart(tendenciasCtx, {
+        type: 'line',
+        data: {
+            labels: {{ tendencias.labels|safe }},
+            datasets: [
+                {
+                    label: 'Ventas ($)',
+                    data: {{ tendencias.ventas|safe }},
+                    borderColor: 'rgb(99, 102, 241)',
+                    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                    yAxisID: 'y',
+                    tension: 0.4,
+                    fill: true
+                },
+                {
+                    label: 'Conversión (%)',
+                    data: {{ tendencias.conversion|safe }},
+                    borderColor: 'rgb(34, 197, 94)',
+                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                    yAxisID: 'y1',
+                    tension: 0.4,
+                    fill: true
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            plugins: {
+                legend: {
+                    position: 'top',
+                }
+            },
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    title: {
+                        display: true,
+                        text: 'Ventas ($)'
+                    },
+                    ticks: {
+                        callback: function(value) {
+                            return '$' + value.toLocaleString();
+                        }
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Conversión (%)'
+                    },
+                    grid: {
+                        drawOnChartArea: false,
+                    },
+                    ticks: {
+                        callback: function(value) {
+                            return value + '%';
+                        }
+                    }
+                },
+            }
+        }
+    });
+}
+</script>
+{% endblock %}

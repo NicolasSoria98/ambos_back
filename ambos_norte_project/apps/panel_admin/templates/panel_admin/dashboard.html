@@ -1,0 +1,383 @@
+{% extends 'panel_admin/base.html' %}
+
+{% block title %}Dashboard Principal - Ambos Norte{% endblock %}
+
+{% block content %}
+<div class="px-4 py-6 sm:px-0">
+    <!-- Header -->
+    <div class="mb-8">
+        <h2 class="text-3xl font-bold text-gray-900">Dashboard Principal</h2>
+        <p class="mt-1 text-sm text-gray-600">
+            Resumen general del negocio - {{ "now"|date:"d/m/Y H:i" }}
+        </p>
+    </div>
+
+    <!-- KPIs Principales -->
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+        <!-- Ventas -->
+        <div class="bg-white overflow-hidden shadow-lg rounded-lg fade-in hover:shadow-xl transition-shadow">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="rounded-md bg-indigo-500 p-3">
+                            <i class="fas fa-dollar-sign text-white text-2xl"></i>
+                        </div>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">
+                                Ventas Hoy
+                            </dt>
+                            <dd class="flex items-baseline">
+                                <div class="text-2xl font-semibold text-gray-900">
+                                    ${{ kpis.ventas.hoy|floatformat:0|default:"0" }}
+                                </div>
+                                <div class="ml-2 flex items-baseline text-sm font-semibold {% if kpis.ventas.cambio.positivo %}text-green-600{% else %}text-red-600{% endif %}">
+                                    {% if kpis.ventas.cambio.positivo %}
+                                        <i class="fas fa-arrow-up mr-1"></i>
+                                    {% else %}
+                                        <i class="fas fa-arrow-down mr-1"></i>
+                                    {% endif %}
+                                    {{ kpis.ventas.cambio.valor|floatformat:1 }}%
+                                </div>
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pedidos -->
+        <div class="bg-white overflow-hidden shadow-lg rounded-lg fade-in hover:shadow-xl transition-shadow">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="rounded-md bg-green-500 p-3">
+                            <i class="fas fa-shopping-cart text-white text-2xl"></i>
+                        </div>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">
+                                Pedidos Hoy
+                            </dt>
+                            <dd class="flex items-baseline">
+                                <div class="text-2xl font-semibold text-gray-900">
+                                    {{ kpis.pedidos.hoy|default:"0" }}
+                                </div>
+                                <div class="ml-2 flex items-baseline text-sm font-semibold {% if kpis.pedidos.cambio.positivo %}text-green-600{% else %}text-red-600{% endif %}">
+                                    {% if kpis.pedidos.cambio.positivo %}
+                                        <i class="fas fa-arrow-up mr-1"></i>
+                                    {% else %}
+                                        <i class="fas fa-arrow-down mr-1"></i>
+                                    {% endif %}
+                                    {{ kpis.pedidos.cambio.valor|floatformat:1 }}%
+                                </div>
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Usuarios Activos -->
+        <div class="bg-white overflow-hidden shadow-lg rounded-lg fade-in hover:shadow-xl transition-shadow">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="rounded-md bg-yellow-500 p-3">
+                            <i class="fas fa-users text-white text-2xl"></i>
+                        </div>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">
+                                Usuarios Activos
+                            </dt>
+                            <dd class="flex items-baseline">
+                                <div class="text-2xl font-semibold text-gray-900">
+                                    {{ kpis.usuarios.hoy|default:"0" }}
+                                </div>
+                                <div class="ml-2 flex items-baseline text-sm font-semibold {% if kpis.usuarios.cambio.positivo %}text-green-600{% else %}text-red-600{% endif %}">
+                                    {% if kpis.usuarios.cambio.positivo %}
+                                        <i class="fas fa-arrow-up mr-1"></i>
+                                    {% else %}
+                                        <i class="fas fa-arrow-down mr-1"></i>
+                                    {% endif %}
+                                    {{ kpis.usuarios.cambio.valor|floatformat:1 }}%
+                                </div>
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ticket Promedio -->
+        <div class="bg-white overflow-hidden shadow-lg rounded-lg fade-in hover:shadow-xl transition-shadow">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="rounded-md bg-purple-500 p-3">
+                            <i class="fas fa-receipt text-white text-2xl"></i>
+                        </div>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">
+                                Ticket Promedio
+                            </dt>
+                            <dd class="flex items-baseline">
+                                <div class="text-2xl font-semibold text-gray-900">
+                                    ${{ kpis.ticket.hoy|floatformat:0|default:"0" }}
+                                </div>
+                                <div class="ml-2 flex items-baseline text-sm font-semibold {% if kpis.ticket.cambio.positivo %}text-green-600{% else %}text-red-600{% endif %}">
+                                    {% if kpis.ticket.cambio.positivo %}
+                                        <i class="fas fa-arrow-up mr-1"></i>
+                                    {% else %}
+                                        <i class="fas fa-arrow-down mr-1"></i>
+                                    {% endif %}
+                                    {{ kpis.ticket.cambio.valor|floatformat:1 }}%
+                                </div>
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alertas -->
+    {% if alertas %}
+    <div class="mb-8">
+        <div class="bg-white shadow-lg rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                <i class="fas fa-bell text-yellow-500 mr-2"></i>
+                Alertas del Sistema
+            </h3>
+            <div class="space-y-3">
+                {% for alerta in alertas %}
+                <div class="flex items-center p-3 {% if alerta.tipo == 'warning' %}bg-yellow-50 border-l-4 border-yellow-400{% else %}bg-blue-50 border-l-4 border-blue-400{% endif %} rounded">
+                    <span class="text-2xl mr-3">{{ alerta.icono }}</span>
+                    <div class="flex-1">
+                        <p class="text-sm font-medium text-gray-900">{{ alerta.mensaje }}</p>
+                    </div>
+                    <a href="{{ alerta.url }}" class="text-sm font-medium {% if alerta.tipo == 'warning' %}text-yellow-700 hover:text-yellow-900{% else %}text-blue-700 hover:text-blue-900{% endif %}">
+                        Ver <i class="fas fa-arrow-right ml-1"></i>
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Gráfico de Ventas y Otros Widgets -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+        <!-- Gráfico de Ventas (2 columnas) -->
+        <div class="lg:col-span-2 bg-white shadow-lg rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                <i class="fas fa-chart-line text-indigo-500 mr-2"></i>
+                Ventas Últimos 30 Días
+            </h3>
+            <div class="relative" style="height: 300px;">
+                <canvas id="ventasChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Top Productos (1 columna) -->
+        <div class="bg-white shadow-lg rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                <i class="fas fa-trophy text-yellow-500 mr-2"></i>
+                Top 5 Productos
+            </h3>
+            <div class="space-y-4">
+                {% for metrica in top_productos %}
+                <div class="flex items-center">
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-gray-900 truncate">
+                            {{ metrica.producto.nombre }}
+                        </p>
+                        <p class="text-xs text-gray-500">
+                            {{ metrica.compras_completadas }} ventas
+                        </p>
+                    </div>
+                    <div class="ml-2 flex-shrink-0">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            ${{ metrica.ingreso_generado|floatformat:0 }}
+                        </span>
+                    </div>
+                </div>
+                {% empty %}
+                <p class="text-sm text-gray-500 text-center py-4">No hay datos disponibles</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Más Widgets -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Stock Bajo -->
+        <div class="bg-white shadow-lg rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                <i class="fas fa-exclamation-triangle text-red-500 mr-2"></i>
+                Stock Bajo
+            </h3>
+            <div class="space-y-3 max-h-64 overflow-y-auto">
+                {% for producto in stock_bajo %}
+                <div class="flex items-center justify-between p-2 bg-red-50 rounded">
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-gray-900 truncate">
+                            {{ producto.nombre }}
+                        </p>
+                        <p class="text-xs text-gray-500">
+                            {{ producto.categoria.nombre }}
+                        </p>
+                    </div>
+                    <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                        {{ producto.stock }} unid.
+                    </span>
+                </div>
+                {% empty %}
+                <p class="text-sm text-gray-500 text-center py-4">✅ Stock normal en todos los productos</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Pedidos Pendientes -->
+        <div class="bg-white shadow-lg rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                <i class="fas fa-clock text-orange-500 mr-2"></i>
+                Pedidos Pendientes
+            </h3>
+            <div class="space-y-3 max-h-64 overflow-y-auto">
+                {% for pedido in pedidos_pendientes %}
+                <div class="border-l-4 border-orange-400 pl-3 py-2">
+                    <p class="text-sm font-medium text-gray-900">
+                        #{{ pedido.numero_pedido }}
+                    </p>
+                    <p class="text-xs text-gray-500">
+                        {{ pedido.usuario.username|default:"Anónimo" }} - ${{ pedido.total|floatformat:0 }}
+                    </p>
+                    <p class="text-xs text-gray-400">
+                        {{ pedido.fecha_pedido|date:"d/m/Y H:i" }}
+                    </p>
+                </div>
+                {% empty %}
+                <p class="text-sm text-gray-500 text-center py-4">✅ No hay pedidos pendientes</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Ventas por Categoría -->
+        <div class="bg-white shadow-lg rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                <i class="fas fa-chart-pie text-indigo-500 mr-2"></i>
+                Top Categorías
+            </h3>
+            <div class="relative" style="height: 250px;">
+                <canvas id="categoriasChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Gráfico de Ventas
+const ventasCtx = document.getElementById('ventasChart');
+if (ventasCtx) {
+    const ventasChart = new Chart(ventasCtx, {
+        type: 'line',
+        data: {
+            labels: {{ grafico_ventas.labels|safe }},
+            datasets: [{
+                label: 'Ventas ($)',
+                data: {{ grafico_ventas.ventas|safe }},
+                borderColor: 'rgb(99, 102, 241)',
+                backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                tension: 0.4,
+                fill: true,
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return 'Ventas: $' + context.parsed.y.toLocaleString();
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return '$' + value.toLocaleString();
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Gráfico de Categorías
+const categoriasCtx = document.getElementById('categoriasChart');
+if (categoriasCtx) {
+    const categoriasData = {
+        labels: [
+            {% for cat in categorias_resumen %}
+                '{{ cat.nombre }}'{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ],
+        datasets: [{
+            data: [
+                {% for cat in categorias_resumen %}
+                    {{ cat.total_vendido|default:0 }}{% if not forloop.last %},{% endif %}
+                {% endfor %}
+            ],
+            backgroundColor: [
+                'rgba(99, 102, 241, 0.8)',
+                'rgba(34, 197, 94, 0.8)',
+                'rgba(234, 179, 8, 0.8)',
+                'rgba(168, 85, 247, 0.8)',
+                'rgba(239, 68, 68, 0.8)'
+            ],
+            borderWidth: 0
+        }]
+    };
+
+    const categoriasChart = new Chart(categoriasCtx, {
+        type: 'doughnut',
+        data: categoriasData,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 10,
+                        font: {
+                            size: 11
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+</script>
+{% endblock %}

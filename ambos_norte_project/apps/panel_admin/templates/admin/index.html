@@ -1,0 +1,204 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+    .dashboard-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+    
+    .stat-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 20px rgba(0,0,0,0.15);
+    }
+    
+    .stat-card h3 {
+        font-size: 0.875rem;
+        opacity: 0.9;
+        margin: 0 0 10px 0;
+        font-weight: 500;
+    }
+    
+    .stat-card .stat-value {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin: 0;
+    }
+    
+    .stat-card.green {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    }
+    
+    .stat-card.yellow {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    }
+    
+    .stat-card.red {
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    }
+    
+    .quick-actions {
+        background: white;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.07);
+        margin-bottom: 30px;
+    }
+    
+    .quick-actions h2 {
+        margin: 0 0 20px 0;
+        color: #1f2937;
+        font-size: 1.25rem;
+        font-weight: 600;
+    }
+    
+    .action-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 15px;
+    }
+    
+    .action-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 15px;
+        background: #f3f4f6;
+        border-radius: 8px;
+        text-decoration: none;
+        color: #4b5563;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        border: 2px solid transparent;
+    }
+    
+    .action-btn:hover {
+        background: #eef2ff;
+        border-color: #667eea;
+        color: #667eea;
+        transform: translateY(-2px);
+    }
+    
+    .action-btn svg {
+        width: 20px;
+        height: 20px;
+        margin-right: 8px;
+    }
+</style>
+{% endblock %}
+
+{% block breadcrumbs %}{% endblock %}
+
+{% block content %}
+<div id="content-main">
+    <!-- Stats Cards -->
+    <div class="dashboard-stats">
+        <div class="stat-card">
+            <h3>Total Productos</h3>
+            <p class="stat-value">{{ productos_count|default:"0" }}</p>
+        </div>
+        <div class="stat-card green">
+            <h3>Pedidos Hoy</h3>
+            <p class="stat-value">{{ pedidos_hoy|default:"0" }}</p>
+        </div>
+        <div class="stat-card yellow">
+            <h3>Usuarios Activos</h3>
+            <p class="stat-value">{{ usuarios_activos|default:"0" }}</p>
+        </div>
+        <div class="stat-card red">
+            <h3>Stock Bajo</h3>
+            <p class="stat-value">{{ stock_bajo|default:"0" }}</p>
+        </div>
+    </div>
+
+    <!-- Acciones Rápidas -->
+    <div class="quick-actions">
+        <h2>⚡ Acciones Rápidas</h2>
+        <div class="action-grid">
+            <a href="{% url 'admin:catalogo_producto_add' %}" class="action-btn">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Nuevo Producto
+            </a>
+            <a href="{% url 'admin:pedidos_pedido_changelist' %}" class="action-btn">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                </svg>
+                Ver Pedidos
+            </a>
+            <a href="{% url 'admin:usuarios_usuario_changelist' %}" class="action-btn">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                </svg>
+                Usuarios
+            </a>
+            <a href="/dashboard/" class="action-btn">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                </svg>
+                Dashboard Analytics
+            </a>
+        </div>
+    </div>
+
+    <!-- Apps del Admin -->
+    <div class="app-index">
+        {% if app_list %}
+            {% for app in app_list %}
+                <div class="module">
+                    <table>
+                        <caption>
+                            <a href="{{ app.app_url }}" class="section" title="{% blocktranslate with name=app.name %}Models in the {{ name }} application{% endblocktranslate %}">
+                                {{ app.name }}
+                            </a>
+                        </caption>
+                        {% for model in app.models %}
+                            <tr class="model-{{ model.object_name|lower }}">
+                                {% if model.admin_url %}
+                                    <th scope="row">
+                                        <a href="{{ model.admin_url }}">{{ model.name }}</a>
+                                    </th>
+                                {% else %}
+                                    <th scope="row">{{ model.name }}</th>
+                                {% endif %}
+
+                                {% if model.add_url %}
+                                    <td><a href="{{ model.add_url }}" class="addlink">{% translate 'Add' %}</a></td>
+                                {% else %}
+                                    <td>&nbsp;</td>
+                                {% endif %}
+
+                                {% if model.admin_url %}
+                                    {% if model.view_only %}
+                                        <td><a href="{{ model.admin_url }}" class="viewlink">{% translate 'View' %}</a></td>
+                                    {% else %}
+                                        <td><a href="{{ model.admin_url }}" class="changelink">{% translate 'Change' %}</a></td>
+                                    {% endif %}
+                                {% else %}
+                                    <td>&nbsp;</td>
+                                {% endif %}
+                            </tr>
+                        {% endfor %}
+                    </table>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p>{% translate "You don't have permission to view or edit anything." %}</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
