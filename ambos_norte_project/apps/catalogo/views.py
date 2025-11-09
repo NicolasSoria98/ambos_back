@@ -5,7 +5,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
 from django.core.exceptions import ValidationError
 from .models import Categoria, Producto, ImagenProducto
-from .serilizer import CategoriaSerializar, ProductoSerializer, ImagenProductoSerializer
+# ✅ CORREGIDO: usar serializers.py (no serilizer.py)
+from .serializers import CategoriaSerializer, ProductoListSerializer, ProductoDetailSerializer, ImagenProductoSerializer
 from apps.analytics.utils import AnalyticsTracker
 
 
@@ -14,7 +15,7 @@ class CategoriaViewSet(viewsets.ModelViewSet):
     ViewSet para gestionar categorías de productos
     """
     queryset = Categoria.objects.all()
-    serializer_class = CategoriaSerializar
+    serializer_class = CategoriaSerializer
     
     def get_permissions(self):
         """
@@ -31,7 +32,12 @@ class ProductoViewSet(viewsets.ModelViewSet):
     ViewSet para gestionar productos con analytics
     """
     queryset = Producto.objects.all()
-    serializer_class = ProductoSerializer
+    
+    def get_serializer_class(self):
+        """Usar serializer detallado para retrieve, simple para list"""
+        if self.action == 'retrieve':
+            return ProductoDetailSerializer
+        return ProductoListSerializer
     
     def get_queryset(self):
         """
@@ -44,7 +50,7 @@ class ProductoViewSet(viewsets.ModelViewSet):
         if categoria:
             queryset = queryset.filter(categoria_id=categoria)
         
-        # Filtro por búsqueda en list
+        # Filtro por búsqueda en nombre
         search = self.request.query_params.get('search', None)
         if search:
             queryset = queryset.filter(
@@ -69,7 +75,6 @@ class ProductoViewSet(viewsets.ModelViewSet):
                 stock_max_int = int(stock_max)
                 queryset = queryset.filter(stock__lte=stock_max_int)
             except (TypeError, ValueError):
-                # Si el parámetro no es válido, se ignora el filtro
                 pass
 
         return queryset.select_related('categoria').prefetch_related('imagenes')
@@ -260,4 +265,4 @@ class ImagenProductoViewSet(viewsets.ModelViewSet):
         if producto_id:
             queryset = queryset.filter(producto_id=producto_id)
         
-        return queryset.order_by('orden', 'fecha_subida')
+        return queryset.order_by('orden')

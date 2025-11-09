@@ -6,7 +6,8 @@ from .models import (
     ConfiguracionGoogleAnalytics,
     DatosGoogleAnalytics
 )
-from apps.catalogo.serializers import ProductoSerializer, CategoriaSerializer as CategoriaSerializar
+# ✅ CORREGIDO: CategoriaSerializer sin alias
+from apps.catalogo.serializers import ProductoListSerializer, CategoriaSerializer
 from apps.usuarios.serializer import UsuarioSerializer
 
 
@@ -15,7 +16,7 @@ class EventoUsuarioSerializer(serializers.ModelSerializer):
     Serializer para eventos de usuario
     """
     usuario_detalle = UsuarioSerializer(source='usuario', read_only=True)
-    producto_detalle = ProductoSerializer(source='producto', read_only=True)
+    producto_detalle = ProductoListSerializer(source='producto', read_only=True)
     tipo_evento_display = serializers.CharField(source='get_tipo_evento_display', read_only=True)
     
     class Meta:
@@ -101,7 +102,7 @@ class MetricaProductoSerializer(serializers.ModelSerializer):
     """
     Serializer para métricas de productos
     """
-    producto_detalle = ProductoSerializer(source='producto', read_only=True)
+    producto_detalle = ProductoListSerializer(source='producto', read_only=True)
     producto_nombre = serializers.CharField(source='producto.nombre', read_only=True)
     producto_precio = serializers.DecimalField(
         source='producto.precio',
@@ -134,11 +135,11 @@ class MetricaDiariaSerializer(serializers.ModelSerializer):
     """
     Serializer para métricas diarias
     """
-    producto_mas_vendido_detalle = ProductoSerializer(
+    producto_mas_vendido_detalle = ProductoListSerializer(
         source='producto_mas_vendido',
         read_only=True
     )
-    categoria_mas_vendida_detalle = CategoriaSerializar(
+    categoria_mas_vendida_detalle = CategoriaSerializer(
         source='categoria_mas_vendida',
         read_only=True
     )
@@ -188,8 +189,6 @@ class ConfiguracionGoogleAnalyticsSerializer(serializers.ModelSerializer):
             'error_ultimo'
         ]
         read_only_fields = ['ultima_sincronizacion', 'error_ultimo']
-    
-    # No exponer credenciales en el serializer por seguridad
 
 
 class DatosGoogleAnalyticsSerializer(serializers.ModelSerializer):

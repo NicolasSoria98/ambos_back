@@ -1,15 +1,8 @@
 from rest_framework.routers import DefaultRouter
-from django.urls import path
-from .views import UsuarioViewSet
+from .views import UsuarioViewSet, DireccionViewSet
 
 router = DefaultRouter()
-router.register(r'usuario', UsuarioViewSet, basename='usuario')
+router.register(r'usuarios', UsuarioViewSet, basename='usuario')
+router.register(r'direcciones', DireccionViewSet, basename='direccion')
 
-# Rutas de compatibilidad para auth bajo /api/usuarios/
-auth_patterns = [
-    path('login/', UsuarioViewSet.as_view({'post': 'login'}), name='usuarios-login'),
-    path('registro/', UsuarioViewSet.as_view({'post': 'registro'}), name='usuarios-registro'),
-    path('me/', UsuarioViewSet.as_view({'get': 'me'}), name='usuarios-me'),
-]
-
-urlpatterns = router.urls + auth_patterns
+urlpatterns = router.urls
