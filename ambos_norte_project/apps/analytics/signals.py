@@ -104,7 +104,8 @@ def registrar_pedido(sender, instance, created, **kwargs):
             print(f"Error registrando inicio checkout: {e}")
     
     # Registrar compra completada cuando el estado cambia a 'pagado'
-    if not created and instance.estado_pedido == 'pagado':
+    # ⬅️ CAMBIO AQUÍ: estado_pedido → estado
+    if not created and instance.estado == 'pagado':
         try:
             # Verificar si ya existe un evento de compra para este pedido
             existe = EventoUsuario.objects.filter(
