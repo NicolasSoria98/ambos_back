@@ -16,6 +16,8 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
+  // Calcular isAdmin basado en el user actual
+  const isAdmin = user?.tipo_usuario === 'administrador' || user?.is_staff === true;
   // Cargar usuario al iniciar
   useEffect(() => {
     checkAuth();
@@ -113,6 +115,7 @@ export const AuthProvider = ({ children }) => {
     user,
     isAuthenticated,
     loading,
+    isAdmin,
     isAdmin: authService.isAdmin(),
     loginAdmin,
     loginCliente,

@@ -4,24 +4,25 @@ import { useAuth } from "../context/AuthContext";
 
 export default function Registro() {
   const navigate = useNavigate();
-  const { loginCliente, register, isAuthenticated } = useAuth();
+  const { loginCliente, register, isAuthenticated, user, isAdmin } = useAuth(); // ⬅️ Agregar user e isAdmin
   const [modo, setModo] = useState("login");
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     first_name: "",
     last_name: "",
     email: "",
-    telefono: "", // ⬅️ Cambio: era "phone", ahora "telefono"
-    username: "", // ⬅️ Nuevo campo
+    telefono: "",
+    username: "",
     password: "",
     password_confirm: "",
   });
 
   useEffect(() => {
-    if (isAuthenticated) {
+    // Solo redirigir si es cliente autenticado, NO si es admin
+    if (isAuthenticated && user && !isAdmin) { // ⬅️ CAMBIO AQUÍ
       navigate("/perfil");
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, user, isAdmin, navigate]); // ⬅️ AGREGAR DEPENDENCIAS
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -29,57 +30,56 @@ export default function Registro() {
     
     // Auto-generar username desde el email
     if (name === "email") {
-      const username = value.split('@')[0]; // Toma la parte antes del @
+      const username = value.split('@')[0];
       setFormData((prev) => ({ ...prev, username }));
     }
   };
 
   const onSubmit = async (e) => {
-  e.preventDefault();
-  setLoading(true);
+    e.preventDefault();
+    setLoading(true);
 
-  try {
-    if (modo === "login") {
-      // LOGIN
-      const result = await loginCliente(formData.email, formData.password);
-      
-      if (result.success) {
-        navigate("/perfil");
+    try {
+      if (modo === "login") {
+        // LOGIN
+        const result = await loginCliente(formData.email, formData.password);
+        
+        if (result.success) {
+          navigate("/perfil");
+        } else {
+          alert(result.message || "Credenciales incorrectas");
+        }
       } else {
-        alert(result.message || "Credenciales incorrectas");
-      }
-    } else {
-      // REGISTRO
-      // Validar que las contraseñas coincidan
-      if (formData.password !== formData.password_confirm) {
-        alert("Las contraseñas no coinciden");
-        setLoading(false);
-        return;
-      }
+        // REGISTRO
+        if (formData.password !== formData.password_confirm) {
+          alert("Las contraseñas no coinciden");
+          setLoading(false);
+          return;
+        }
 
-      const result = await register({
-        username: formData.username || formData.email.split('@')[0],
-        first_name: formData.first_name,
-        last_name: formData.last_name,
-        email: formData.email,
-        telefono: formData.telefono,
-        password: formData.password,
-        password_confirm: formData.password_confirm, // ⬅️ AGREGAR ESTE CAMPO
-      });
+        const result = await register({
+          username: formData.username || formData.email.split('@')[0],
+          first_name: formData.first_name,
+          last_name: formData.last_name,
+          email: formData.email,
+          telefono: formData.telefono,
+          password: formData.password,
+          password_confirm: formData.password_confirm,
+        });
 
-      if (result.success) {
-        navigate("/perfil");
-      } else {
-        alert(result.message || "Error al registrarse");
+        if (result.success) {
+          navigate("/perfil");
+        } else {
+          alert(result.message || "Error al registrarse");
+        }
       }
+    } catch (error) {
+      console.error("Error:", error);
+      alert("Error de conexión con el servidor");
+    } finally {
+      setLoading(false);
     }
-  } catch (error) {
-    console.error("Error:", error);
-    alert("Error de conexión con el servidor");
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   return (
     <div className="h-full min-h-[calc(100vh-6rem)] md:min-h-[calc(100vh-8rem)] flex flex-col md:flex-row">
@@ -148,18 +148,16 @@ export default function Registro() {
               className="w-full bg-gray-100 rounded-full px-6 py-3 text-base"
             />
             {modo === "register" && (
-              <>
-                <input
-                  type="password"
-                  name="password_confirm"
-                  placeholder="Confirmar contraseña"
-                  value={formData.password_confirm}
-                  onChange={handleChange}
-                  required
-                  minLength={8}
-                  className="w-full bg-gray-100 rounded-full px-6 py-3 text-base"
-                />
-              </>
+              <input
+                type="password"
+                name="password_confirm"
+                placeholder="Confirmar contraseña"
+                value={formData.password_confirm}
+                onChange={handleChange}
+                required
+                minLength={8}
+                className="w-full bg-gray-100 rounded-full px-6 py-3 text-base"
+              />
             )}
             <button
               type="submit"
