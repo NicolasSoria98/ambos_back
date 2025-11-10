@@ -195,6 +195,46 @@ class UsuarioViewSet(viewsets.ModelViewSet):
             'registros_hoy': registros_hoy
         })
     
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def cambiar_password(self, request, pk=None):
+        """
+        Cambia la contraseña del usuario
+        POST /api/usuarios/usuarios/{id}/cambiar_password/
+        Body: { "old_password": "...", "new_password": "..." }
+        """
+        usuario = self.get_object()
+        
+        # Verificar que el usuario solo pueda cambiar su propia contraseña
+        if usuario.id != request.user.id and not request.user.is_staff:
+            return Response(
+                {'error': 'No tienes permiso para cambiar esta contraseña'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        old_password = request.data.get('old_password')
+        new_password = request.data.get('new_password')
+        
+        if not old_password or not new_password:
+            return Response(
+                {'error': 'Debes proporcionar la contraseña actual y la nueva'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Verificar contraseña actual
+        if not usuario.check_password(old_password):
+            return Response(
+                {'error': 'La contraseña actual es incorrecta'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Establecer nueva contraseña
+        usuario.set_password(new_password)
+        usuario.save()
+        
+        return Response({
+            'mensaje': 'Contraseña actualizada correctamente'
+    })
+    
     @action(detail=False, methods=['post'], permission_classes=[AllowAny])
     def login(self, request):
         """

@@ -1,79 +1,85 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 export default function Registro() {
   const navigate = useNavigate();
+  const { loginCliente, register, isAuthenticated } = useAuth();
   const [modo, setModo] = useState("login");
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     first_name: "",
     last_name: "",
     email: "",
-    phone: "",
+    telefono: "", // ⬅️ Cambio: era "phone", ahora "telefono"
+    username: "", // ⬅️ Nuevo campo
     password: "",
+    password_confirm: "",
   });
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) {
+    if (isAuthenticated) {
       navigate("/perfil");
     }
-  }, [navigate]);
+  }, [isAuthenticated, navigate]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    
+    // Auto-generar username desde el email
+    if (name === "email") {
+      const username = value.split('@')[0]; // Toma la parte antes del @
+      setFormData((prev) => ({ ...prev, username }));
+    }
   };
 
   const onSubmit = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
+  setLoading(true);
 
-    const url =
-      modo === "login"
-        ? "http://127.0.0.1:8000/api/usuarios/login/"
-        : "http://127.0.0.1:8000/api/usuarios/registro/";
-
-    const body =
-      modo === "login"
-        ? { email: formData.email, password: formData.password }
-        : {
-            username: formData.email,
-            first_name: formData.first_name,
-            last_name: formData.last_name,
-            email: formData.email,
-            phone: formData.phone,
-            password: formData.password,
-          };
-
-    try {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) {
-        let msg = "Error al procesar la solicitud";
-        try {
-          const err = await res.json();
-          msg = err.error || err.detail || JSON.stringify(err);
-        } catch (e) {}
-        alert(msg);
+  try {
+    if (modo === "login") {
+      // LOGIN
+      const result = await loginCliente(formData.email, formData.password);
+      
+      if (result.success) {
+        navigate("/perfil");
+      } else {
+        alert(result.message || "Credenciales incorrectas");
+      }
+    } else {
+      // REGISTRO
+      // Validar que las contraseñas coincidan
+      if (formData.password !== formData.password_confirm) {
+        alert("Las contraseñas no coinciden");
+        setLoading(false);
         return;
       }
 
-      const data = await res.json();
+      const result = await register({
+        username: formData.username || formData.email.split('@')[0],
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        email: formData.email,
+        telefono: formData.telefono,
+        password: formData.password,
+        password_confirm: formData.password_confirm, // ⬅️ AGREGAR ESTE CAMPO
+      });
 
-      if (modo === "login") {
-        localStorage.setItem("token", data.access);
-        window.location.href = "/perfil";
+      if (result.success) {
+        navigate("/perfil");
       } else {
-        alert("Registro exitoso. Ahora podés iniciar sesión.");
-        setModo("login");
+        alert(result.message || "Error al registrarse");
       }
-    } catch (error) {
-      alert("Error de conexión con el servidor");
     }
-  };
+  } catch (error) {
+    console.error("Error:", error);
+    alert("Error de conexión con el servidor");
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="h-full min-h-[calc(100vh-6rem)] md:min-h-[calc(100vh-8rem)] flex flex-col md:flex-row">
@@ -113,9 +119,9 @@ export default function Registro() {
                 </div>
                 <input
                   type="tel"
-                  name="phone"
+                  name="telefono"
                   placeholder="Número de teléfono"
-                  value={formData.phone}
+                  value={formData.telefono}
                   onChange={handleChange}
                   required
                   className="w-full bg-gray-100 rounded-full px-6 py-3 text-base mt-4"
@@ -138,25 +144,45 @@ export default function Registro() {
               value={formData.password}
               onChange={handleChange}
               required
+              minLength={8}
               className="w-full bg-gray-100 rounded-full px-6 py-3 text-base"
             />
             {modo === "register" && (
-              <label className="flex items-center gap-2 text-sm text-gray-500 mt-2">
-                <input type="checkbox" required className="accent-[#2F4858]" />
-                <span>
-                  Acepto los Términos y Condiciones.
-                </span>
-              </label>
+              <>
+                <input
+                  type="password"
+                  name="password_confirm"
+                  placeholder="Confirmar contraseña"
+                  value={formData.password_confirm}
+                  onChange={handleChange}
+                  required
+                  minLength={8}
+                  className="w-full bg-gray-100 rounded-full px-6 py-3 text-base"
+                />
+              </>
             )}
-            <button type="submit" className="w-full bg-[#353945] text-white py-3 rounded-full text-base font-semibold hover:scale-[1.02] transition-transform duration-200">
-              {modo === "login" ? "Iniciar sesión" : "Registrarse"}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-[#353945] text-white py-3 rounded-full text-base font-semibold hover:scale-[1.02] transition-transform duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? (
+                <span>Procesando...</span>
+              ) : modo === "login" ? (
+                "Iniciar sesión"
+              ) : (
+                "Registrarse"
+              )}
             </button>
           </form>
           <p className="mt-6 text-center text-sm text-gray-600">
             {modo === "login" ? (
               <>
                 ¿No tenés cuenta?{" "}
-                <span onClick={() => setModo("register")} className="text-[#2F4858] font-semibold cursor-pointer hover:underline">
+                <span
+                  onClick={() => setModo("register")}
+                  className="text-[#2F4858] font-semibold cursor-pointer hover:underline"
+                >
                   Registrate
                 </span>
               </>
