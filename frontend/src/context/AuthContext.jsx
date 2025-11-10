@@ -21,13 +21,21 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, []);
 
-  const checkAuth = () => {
+  const checkAuth = async () => {
     const authenticated = authService.isAuthenticated();
     const currentUser = authService.getCurrentUser();
     
     setIsAuthenticated(authenticated);
     setUser(currentUser);
     setLoading(false);
+
+    // Si hay token pero no hay datos del usuario, obtenerlos del servidor
+    if (authenticated && !currentUser) {
+      const profile = await authService.getProfile();
+      if (profile) {
+        setUser(profile);
+      }
+    }
   };
 
   // Login de administrador
@@ -68,9 +76,8 @@ export const AuthProvider = ({ children }) => {
     const result = await authService.register(userData);
     
     if (result.success) {
-      // Después de registrarse, hacer login automático
-      const loginResult = await loginCliente(userData.email, userData.password);
-      return loginResult;
+      setUser(result.user);
+      setIsAuthenticated(true);
     }
     
     return result;
