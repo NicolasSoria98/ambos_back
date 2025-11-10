@@ -4,25 +4,25 @@ const productsService = {
   // Obtener todos los productos
   getAll: async (filters = {}) => {
     const params = new URLSearchParams(filters);
-    const response = await api.get(`/producto/?${params}`);
+    const response = await api.get(`/catalogo/producto/?${params}`);
     return response.data;
   },
 
   // Obtener un producto por ID
   getById: async (id) => {
-    const response = await api.get(`/producto/${id}/`);
+    const response = await api.get(`/catalogo/producto/${id}/`); 
     return response.data;
   },
 
   // Buscar productos
   search: async (query) => {
-    const response = await api.get(`/producto/buscar/?q=${query}`);
+    const response = await api.get(`/catalogo/producto/buscar/?q=${query}`); 
     return response.data;
   },
 
   // Obtener categorías
   getCategories: async () => {
-    const response = await api.get('/categoria/');
+    const response = await api.get('/catalogo/categoria/'); 
     return response.data;
   },
 
@@ -36,7 +36,7 @@ const productsService = {
         }
       : {};
     
-    const response = await api.post('/producto/', productData, config);
+    const response = await api.post('/catalogo/producto/', productData, config); 
     return response.data;
   },
 
@@ -50,43 +50,43 @@ const productsService = {
         }
       : {};
     
-    const response = await api.put(`/producto/${id}/`, productData, config);
+    const response = await api.patch(`/catalogo/producto/${id}/`, productData, config); 
     return response.data;
   },
 
   // Eliminar producto (admin)
   delete: async (id) => {
-    const response = await api.delete(`/producto/${id}/`);
+    const response = await api.delete(`/catalogo/producto/${id}/`); 
     return response.data;
   },
 
   // Reducir stock
   reduceStock: async (id, cantidad) => {
-    const response = await api.post(`/producto/${id}/reducir_stock/`, { cantidad });
+    const response = await api.post(`/catalogo/producto/${id}/reducir_stock/`, { cantidad }); 
     return response.data;
   },
 
   // Aumentar stock
   increaseStock: async (id, cantidad) => {
-    const response = await api.post(`/producto/${id}/aumentar_stock/`, { cantidad });
+    const response = await api.post(`/catalogo/producto/${id}/aumentar_stock/`, { cantidad }); 
     return response.data;
   },
 
   // Toggle destacado
   toggleDestacado: async (id) => {
-    const response = await api.post(`/producto/${id}/toggle_destacado/`);
+    const response = await api.post(`/catalogo/producto/${id}/toggle_destacado/`); 
     return response.data;
   },
 
   // Toggle activo
   toggleActivo: async (id) => {
-    const response = await api.post(`/producto/${id}/toggle_activo/`);
+    const response = await api.post(`/catalogo/producto/${id}/toggle_activo/`); 
     return response.data;
   },
 
   // Productos con poco stock (para panel admin)
   getLowStockProducts: async (umbral = 10) => {
-    const response = await api.get('/producto/', { params: { stock_max: umbral } });
+    const response = await api.get('/catalogo/producto/', { params: { stock_max: umbral } }); 
     return response.data;
   }
 };

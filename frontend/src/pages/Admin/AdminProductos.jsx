@@ -66,36 +66,61 @@ export default function AdminProductos() {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
+  
+  try {
+    const formDataToSend = new FormData();
     
-    try {
-      const formDataToSend = new FormData();
-      
-      // Agregar todos los campos al FormData
-      Object.keys(formData).forEach(key => {
-        if (key === 'imagen_principal' && formData[key] instanceof File) {
-          formDataToSend.append(key, formData[key]);
-        } else if (formData[key] !== null && formData[key] !== '') {
-          formDataToSend.append(key, formData[key]);
-        }
-      });
-
-      if (editingProduct) {
-        await productsService.update(editingProduct.id, formDataToSend);
-        alert('Producto actualizado correctamente');
-      } else {
-        await productsService.create(formDataToSend);
-        alert('Producto creado correctamente');
-      }
-
-      setShowModal(false);
-      resetForm();
-      cargarDatos();
-    } catch (err) {
-      alert('Error al guardar el producto: ' + err.message);
-      console.error(err);
+    // Agregar campos básicos
+    formDataToSend.append('nombre', formData.nombre);
+    formDataToSend.append('precio', formData.precio);
+    formDataToSend.append('stock', formData.stock);
+    formDataToSend.append('categoria', formData.categoria);
+    formDataToSend.append('activo', formData.activo);
+    formDataToSend.append('destacado', formData.destacado);
+    
+    // Agregar campos opcionales solo si tienen valor
+    if (formData.descripcion) {
+      formDataToSend.append('descripcion', formData.descripcion);
     }
-  };
+    if (formData.talla) {
+      formDataToSend.append('talla', formData.talla);
+    }
+    if (formData.color) {
+      formDataToSend.append('color', formData.color);
+    }
+    if (formData.material) {
+      formDataToSend.append('material', formData.material);
+    }
+    
+    // Agregar imagen solo si es un archivo nuevo
+    if (formData.imagen_principal instanceof File) {
+      formDataToSend.append('imagen_principal', formData.imagen_principal);
+    }
+
+    // Debug: ver qué se está enviando
+    console.log('📤 Datos a enviar:');
+    for (let [key, value] of formDataToSend.entries()) {
+      console.log(`${key}:`, value);
+    }
+
+    if (editingProduct) {
+      await productsService.update(editingProduct.id, formDataToSend);
+      alert('Producto actualizado correctamente');
+    } else {
+      await productsService.create(formDataToSend);
+      alert('Producto creado correctamente');
+    }
+
+    setShowModal(false);
+    resetForm();
+    cargarDatos();
+  } catch (err) {
+    console.error('❌ Error completo:', err);
+    console.error('❌ Response:', err.response?.data);
+    alert('Error al guardar el producto: ' + (err.response?.data?.error || err.message));
+  }
+};
 
   const handleEdit = (producto) => {
     setEditingProduct(producto);

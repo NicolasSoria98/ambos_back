@@ -3,10 +3,16 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.core.exceptions import ValidationError
 from .models import Categoria, Producto, ImagenProducto
-# ✅ CORREGIDO: usar serializers.py (no serilizer.py)
-from .serializers import CategoriaSerializer, ProductoListSerializer, ProductoDetailSerializer, ImagenProductoSerializer
+from .serializers import (
+    CategoriaSerializer, 
+    ProductoListSerializer, 
+    ProductoDetailSerializer, 
+    ProductoSerializer,
+    ImagenProductoSerializer
+)
 from apps.analytics.utils import AnalyticsTracker
 
 
@@ -32,11 +38,14 @@ class ProductoViewSet(viewsets.ModelViewSet):
     ViewSet para gestionar productos con analytics
     """
     queryset = Producto.objects.all()
+    parser_classes = [MultiPartParser, FormParser, JSONParser]  # ⬅️ AGREGAR ESTA LÍNEA
     
     def get_serializer_class(self):
-        """Usar serializer detallado para retrieve, simple para list"""
+        """Usar serializer apropiado según la acción"""
         if self.action == 'retrieve':
             return ProductoDetailSerializer
+        elif self.action in ['create', 'update', 'partial_update']:
+            return ProductoSerializer
         return ProductoListSerializer
     
     def get_queryset(self):
@@ -88,17 +97,58 @@ class ProductoViewSet(viewsets.ModelViewSet):
             return [AllowAny()]
         return [IsAuthenticated(), IsAdminUser()]
 
+    def create(self, request, *args, **kwargs):
+        """Override para debugging y mejor manejo de errores"""
+        try:
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            self.perform_create(serializer)
+            headers = self.get_success_headers(serializer.data)
+            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        except Exception as e:
+            print(f"❌ Error en create: {str(e)}")
+            print(f"📋 Request data: {request.data}")
+            return Response(
+                {'error': str(e)}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    def update(self, request, *args, **kwargs):
+        """Override para debugging y mejor manejo de errores"""
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        
+        try:
+            serializer = self.get_serializer(instance, data=request.data, partial=partial)
+            serializer.is_valid(raise_exception=True)
+            self.perform_update(serializer)
+            
+            if getattr(instance, '_prefetched_objects_cache', None):
+                instance._prefetched_objects_cache = {}
+                
+            return Response(serializer.data)
+        except Exception as e:
+            print(f"❌ Error en update: {str(e)}")
+            print(f"📋 Request data: {request.data}")
+            return Response(
+                {'error': str(e)}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
     def retrieve(self, request, *args, **kwargs):
         """Override para trackear vista de producto"""
         instance = self.get_object()
         
         # Track analytics
-        AnalyticsTracker.track_vista_producto(
-            producto=instance,
-            usuario=request.user if request.user.is_authenticated else None,
-            session_id=request.session.session_key,
-            request=request
-        )
+        try:
+            AnalyticsTracker.track_vista_producto(
+                producto=instance,
+                usuario=request.user if request.user.is_authenticated else None,
+                session_id=request.session.session_key,
+                request=request
+            )
+        except:
+            pass  # No fallar si hay error en analytics
         
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
@@ -123,13 +173,16 @@ class ProductoViewSet(viewsets.ModelViewSet):
             activo=True
         )
         
-        # ✨ Registrar búsqueda
-        AnalyticsTracker.track_busqueda(
-            query=query,
-            usuario=request.user if request.user.is_authenticated else None,
-            session_id=request.session.session_key,
-            resultados_count=productos.count()
-        )
+        # Registrar búsqueda
+        try:
+            AnalyticsTracker.track_busqueda(
+                query=query,
+                usuario=request.user if request.user.is_authenticated else None,
+                session_id=request.session.session_key,
+                resultados_count=productos.count()
+            )
+        except:
+            pass
         
         serializer = self.get_serializer(productos, many=True)
         return Response({
@@ -245,6 +298,7 @@ class ImagenProductoViewSet(viewsets.ModelViewSet):
     """
     queryset = ImagenProducto.objects.all()
     serializer_class = ImagenProductoSerializer
+    parser_classes = [MultiPartParser, FormParser]
     
     def get_permissions(self):
         """

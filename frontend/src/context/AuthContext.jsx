@@ -116,7 +116,6 @@ export const AuthProvider = ({ children }) => {
     isAuthenticated,
     loading,
     isAdmin,
-    isAdmin: authService.isAdmin(),
     loginAdmin,
     loginCliente,
     register,
