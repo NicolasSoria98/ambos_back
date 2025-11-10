@@ -31,12 +31,12 @@ export default function EnvioPago() {
   }, [navigate]);
 
   useEffect(() => {
-    const rawToken = localStorage.getItem("token");
+    const rawToken = localStorage.getItem("authToken");
     const token = rawToken && rawToken !== "undefined" && rawToken !== "null" ? rawToken : null;
     if (!token) return;
     (async () => {
       try {
-        const res = await fetch("http://127.0.0.1:8000/api/usuarios/perfil/", {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/auth/me/`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) return;
@@ -81,7 +81,7 @@ export default function EnvioPago() {
       return;
     }
     try {
-      const rawToken = localStorage.getItem("token");
+      const rawToken = localStorage.getItem("authToken");
       const token = rawToken && rawToken !== "undefined" && rawToken !== "null" ? rawToken : null;
       const metodoPago = "efectivo";
       const pedido = {
@@ -126,7 +126,7 @@ export default function EnvioPago() {
           alert("Inicia sesion para finalizar la compra");
           return;
         }
-        const res = await fetch("http://127.0.0.1:8000/api/pedidos/", {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/pedidos/pedido/`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -139,18 +139,18 @@ export default function EnvioPago() {
           storedOrder = created || storedOrder;
         } else {
           let msg = "No se pudo registrar el pedido";
-          try { const err = await res.json(); msg = err.detail || JSON.stringify(err); } catch {}
+          try { const err = await res.json(); msg = err.detail || JSON.stringify(err); } catch { }
           alert(msg);
           return;
         }
-      } catch {}
+      } catch { }
       localStorage.setItem("last_order", JSON.stringify(storedOrder));
       try {
         const rawList = localStorage.getItem("orders_local");
         const list = rawList ? JSON.parse(rawList) : [];
         const next = [storedOrder, ...Array.isArray(list) ? list : []];
         localStorage.setItem("orders_local", JSON.stringify(next));
-      } catch {}
+      } catch { }
       localStorage.removeItem("cart");
       navigate("/compra-exitosa");
     } catch {
@@ -159,13 +159,13 @@ export default function EnvioPago() {
   };
 
   return (
-    <section className="h-full md:flex md:flex-col md:justify-center md:min-h-[calc(100vh-8rem)] bg-[#F0F6F6] px-8 py-10 md:px-80">
-      <h1 className="text-2xl md:text-4xl font-bold text-[#084B83] mb-6">
-        Finalizar compra
+    <section className="h-full min-h-[calc(100vh-6rem)] md:min-h-[calc(100vh-8rem)] bg-[#F0F6F6] px-8 md:px-96 py-8 md:flex md:flex-col md:justify-center">
+      <h1 className="text-2xl md:text-4xl font-bold text-[#084B83] mb-4">
+        Checkout
       </h1>
-      <div className="bg-white shadow rounded-lg p-4 md:p-8 grid md:grid-cols-3 gap-12">
+      <div className="md:grid md:grid-cols-3 md:gap-12">
         <div className="md:col-span-2">
-          <div className="flex items-center mb-4 text-sm">
+          <div className="flex flex-wrap items-center gap-4 mb-4 text-sm bg-white rounded-lg p-4 py-3 border border-gray-200">
             <label className="flex items-center gap-2">
               <input
                 type="radio"
@@ -176,7 +176,7 @@ export default function EnvioPago() {
               />
               Envío a domicilio (+$2.000)
             </label>
-            <label className="flex items-center gap-2 md:ml-8">
+            <label className="flex items-center gap-2">
               <input
                 type="radio"
                 name="metodoEnvio"
@@ -187,12 +187,11 @@ export default function EnvioPago() {
               Retiro en local (Sin costo)
             </label>
           </div>
-
           <form className="space-y-4">
             <div className="grid md:grid-cols-2 gap-4">
               <div className="flex flex-col">
                 <label className="text-sm font-medium text-[#084B83] mb-1">
-                  Nombre *
+                  Nombre(s)
                 </label>
                 <input
                   name="nombre"
@@ -200,13 +199,13 @@ export default function EnvioPago() {
                   value={form.nombre}
                   onChange={onChange}
                   type="text"
-                  className="w-full border px-4 py-2 rounded-md"
+                  className="w-full border border-gray-200 bg-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
                   required
                 />
               </div>
               <div className="flex flex-col">
                 <label className="text-sm font-medium text-[#084B83] mb-1">
-                  Apellido *
+                  Apellido
                 </label>
                 <input
                   name="apellido"
@@ -214,23 +213,25 @@ export default function EnvioPago() {
                   value={form.apellido}
                   onChange={onChange}
                   type="text"
-                  className="w-full border px-4 py-2 rounded-md"
+                  className="w-full border border-gray-200 bg-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
                   required
                 />
               </div>
             </div>
-
             {metodoEnvio === "envio" && (
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="flex flex-col">
                   <label className="text-sm font-medium text-[#084B83] mb-1">
-                    Ciudad * <span className="text-xs font-light text-gray-500">(Sólo Resistencia y Corrientes)</span>
+                    Ciudad{" "}
+                    <span className="text-xs font-light text-gray-500">
+                      (Sólo Resistencia y Corrientes)
+                    </span>
                   </label>
                   <select
                     name="ciudad"
                     value={form.ciudad}
                     onChange={onChange}
-                    className="border px-2 py-2 rounded-md"
+                    className="w-full border border-gray-200 bg-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
                     required
                   >
                     <option value="">Seleccionar ciudad</option>
@@ -240,7 +241,7 @@ export default function EnvioPago() {
                 </div>
                 <div className="flex flex-col">
                   <label className="text-sm font-medium text-[#084B83] mb-1">
-                    Dirección *
+                    Dirección
                   </label>
                   <input
                     name="direccion"
@@ -248,17 +249,16 @@ export default function EnvioPago() {
                     value={form.direccion}
                     onChange={onChange}
                     type="text"
-                    className="w-full border px-4 py-2 rounded-md"
+                    className="w-full border border-gray-200 bg-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
                     required
                   />
                 </div>
               </div>
             )}
-
             <div className="grid md:grid-cols-2 gap-4">
               <div className="flex flex-col">
                 <label className="text-sm font-medium text-[#084B83] mb-1">
-                  Teléfono *
+                  Teléfono
                 </label>
                 <input
                   name="telefono"
@@ -266,13 +266,13 @@ export default function EnvioPago() {
                   value={form.telefono}
                   onChange={onChange}
                   type="text"
-                  className="w-full border px-4 py-2 rounded-md"
+                  className="w-full border border-gray-200 bg-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
                   required
                 />
               </div>
               <div className="flex flex-col">
                 <label className="text-sm font-medium text-[#084B83] mb-1">
-                  Correo electrónico *
+                  Correo electrónico
                 </label>
                 <input
                   name="email"
@@ -280,85 +280,87 @@ export default function EnvioPago() {
                   value={form.email}
                   onChange={onChange}
                   type="email"
-                  className="w-full border px-4 py-2 rounded-md"
+                  className="w-full border border-gray-200 bg-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
                   required
                 />
               </div>
             </div>
 
-
-
             <div className="flex flex-col">
               <label className="text-sm font-medium text-[#084B83] mb-1">
                 Notas
               </label>
-              <textarea
+              <input
                 placeholder="(Opcional)"
                 name="notas"
                 value={form.notas}
                 onChange={onChange}
-                className="w-full border px-4 py-2 rounded-md"
+                type="text"
+                  className="w-full border border-gray-200 bg-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
               />
             </div>
           </form>
         </div>
-
-        <aside className="md:col-span-1">
-          <h2 className="text-2xl font-semibold mb-4">Resumen del pedido</h2>
+        <aside className="md:col-span-1 md:flex md:flex-col md:justify-center mb-8 md:mb-0">
+          <h2 className="text-xl md:text-2xl font-semibold mb-4 mt-8 md:mt-0 text-[#084B83]">
+            Resumen del pedido
+          </h2>
           <div className="border rounded-lg p-4 bg-white">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-gray-500">
-                  <th className="text-left pb-2">Producto</th>
-                  <th className="text-right pb-2">Cant.</th>
-                  <th className="text-right pb-2">Subtotal</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((it) => (
-                  <tr key={it.id} className="border-t">
-                    <td className="py-2">{it.nombre}</td>
-                    <td className="py-2 text-right">{it.cantidad || 1}</td>
-                    <td className="py-2 text-right">
-                      ${Number((it.precio || 0) * (it.cantidad || 1)).toLocaleString()}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm table-auto whitespace-nowrap md:whitespace-normal">
+                <thead>
+                  <tr className="text-gray-500">
+                    <th className="text-left pb-2">Producto</th>
+                    <th className="text-right pb-2">Cant.</th>
+                    <th className="text-right pb-2">Subtotal</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((it) => (
+                    <tr key={it.id} className="border-t">
+                      <td className="py-2 max-w-[8rem] truncate overflow-hidden text-ellipsis">{it.nombre}</td>
+
+                      <td className="py-2 text-right">{it.cantidad || 1}</td>
+                      <td className="py-2 text-right">
+                        ${Number((it.precio || 0) * (it.cantidad || 1)).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t">
+                    <td className="pt-3 text-gray-600">Productos</td>
+                    <td></td>
+                    <td className="pt-3 text-right font-semibold">
+                      ${Number(total).toLocaleString()}
                     </td>
                   </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="border-t">
-                  <td className="pt-3 text-gray-600">Productos</td>
-                  <td></td>
-                  <td className="pt-3 text-right font-semibold">
-                    ${Number(total).toLocaleString()}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="pt-1 text-gray-600">Envío</td>
-                  <td></td>
-                  <td className="pt-1 text-right font-semibold">
-                    ${Number(costoEnvio).toLocaleString()}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="pt-2 font-semibold">Total</td>
-                  <td></td>
-                  <td className="pt-2 text-right text-lg font-bold">
-                    ${Number(totalConEnvio).toLocaleString()}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-            <button
-              onClick={finalizarCompra}
-              className="mt-6 w-full bg-black text-white px-6 py-3 rounded-full hover:bg-gray-800 transition"
-            >
-              Finalizar compra
-            </button>
+                  <tr>
+                    <td className="pt-1 text-gray-600">Envío</td>
+                    <td></td>
+                    <td className="pt-1 text-right font-semibold">
+                      ${Number(costoEnvio).toLocaleString()}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="pt-2 font-semibold">Total</td>
+                    <td></td>
+                    <td className="pt-2 text-right text-lg font-bold">
+                      ${Number(totalConEnvio).toLocaleString()}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
           </div>
+          <button
+            onClick={finalizarCompra}
+            className="w-full mt-6 uppercase bg-[#084B83] text-white px-8 py-3 rounded-full font-semibold text-sm hover:scale-[1.02] transition-transform duration-200"
+          >
+            Finalizar compra
+          </button>
         </aside>
       </div>
     </section>
-
   );
 }

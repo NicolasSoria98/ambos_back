@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
+import authService from "../services/auth";
 
 export default function Navbar() {
   const location = useLocation();
@@ -10,12 +11,9 @@ export default function Navbar() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      fetch("http://127.0.0.1:8000/api/usuarios/perfil/", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-        .then((res) => (res.ok ? res.json() : null))
+    if (authService.isAuthenticated()) {
+      authService
+        .getProfile()
         .then((data) => setUsuario(data))
         .catch(() => setUsuario({ nombre: "Usuario" }));
     }
@@ -23,7 +21,7 @@ export default function Navbar() {
 
   const handleLogout = () => {
     try {
-      localStorage.removeItem("token");
+      authService.logout();
       setUsuario(null);
       setMenuOpen(false);
       navigate("/");
@@ -98,11 +96,11 @@ export default function Navbar() {
             {!isRegistro && (
               <li>
                 {usuario ? (
-                  <div className="flex items-center">
+                  <div className="flex flex-col items-start">
                     <Link to="/perfil" onClick={() => setMenuOpen(false)} className="font-semibold">
-                      {usuario.first_name ? usuario.first_name : "Mi perfil"}
+                      Mi perfil
                     </Link>
-                    <button onClick={handleLogout} className="font-semibold">
+                    <button onClick={handleLogout} className="font-semibold text-red-500">
                       Cerrar sesión
                     </button>
                   </div>

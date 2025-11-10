@@ -8,7 +8,7 @@ export default function Perfil() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isAuthenticated, logout, refreshUser } = useAuth();
-  
+
   const [seccion, setSeccion] = useState("datos");
   const [pedidos, setPedidos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -20,7 +20,6 @@ export default function Perfil() {
   });
   const [pwd, setPwd] = useState({ current: "", next: "", confirm: "" });
 
-  // Verificar autenticación
   useEffect(() => {
     if (!isAuthenticated) {
       alert("Debes iniciar sesión");
@@ -28,7 +27,6 @@ export default function Perfil() {
     }
   }, [isAuthenticated, navigate]);
 
-  // Detectar tab desde URL
   useEffect(() => {
     try {
       const params = new URLSearchParams(location.search);
@@ -36,10 +34,9 @@ export default function Perfil() {
       if (tab === "pedidos" || tab === "seguridad" || tab === "datos") {
         setSeccion(tab);
       }
-    } catch {}
+    } catch { }
   }, [location.search]);
 
-  // Cargar datos del usuario
   useEffect(() => {
     if (user) {
       setFormData({
@@ -52,20 +49,18 @@ export default function Perfil() {
     }
   }, [user]);
 
-  // Cargar pedidos
   useEffect(() => {
     const cargarPedidos = async () => {
       try {
         const token = localStorage.getItem("authToken");
-        const response = await fetch("http://127.0.0.1:8000/api/pedidos/", {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/pedidos/pedido/`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
         if (response.ok) {
           const serverOrders = await response.json();
           const ordersArray = Array.isArray(serverOrders) ? serverOrders : [];
-          
-          // Intentar cargar pedidos locales
+
           let localOrders = [];
           try {
             const rawList = localStorage.getItem("orders_local");
@@ -73,15 +68,14 @@ export default function Perfil() {
               const arr = JSON.parse(rawList);
               if (Array.isArray(arr)) localOrders = arr;
             }
-          } catch {}
+          } catch { }
 
-          // Combinar pedidos
           const byId = new Map();
           for (const so of ordersArray) byId.set(String(so.id), so);
           for (const lo of localOrders) {
             if (!byId.has(String(lo.id))) byId.set(String(lo.id), lo);
           }
-          
+
           setPedidos(Array.from(byId.values()));
         }
       } catch (error) {
@@ -101,11 +95,11 @@ export default function Perfil() {
 
   const handleGuardar = async (e) => {
     e.preventDefault();
-    
+
     try {
       const token = localStorage.getItem("authToken");
       const response = await fetch(
-        `http://127.0.0.1:8000/api/usuarios/usuarios/${user.id}/`,
+        `${import.meta.env.VITE_API_URL}/usuarios/usuarios/${user.id}/`,
         {
           method: "PATCH",
           headers: {
@@ -122,7 +116,6 @@ export default function Perfil() {
 
       if (response.ok) {
         alert("Datos actualizados correctamente");
-        // Actualizar usuario en el contexto
         await refreshUser();
       } else {
         const error = await response.json();
@@ -141,17 +134,17 @@ export default function Perfil() {
 
   const handleCambiarContrasena = async (e) => {
     e.preventDefault();
-    
+
     if (!pwd.current || !pwd.next || !pwd.confirm) {
       alert("Completa todos los campos de contraseña");
       return;
     }
-    
+
     if (pwd.next !== pwd.confirm) {
       alert("La nueva contraseña y la confirmación no coinciden");
       return;
     }
-    
+
     if (pwd.next.length < 8) {
       alert("La contraseña debe tener al menos 8 caracteres");
       return;
@@ -160,7 +153,7 @@ export default function Perfil() {
     try {
       const token = localStorage.getItem("authToken");
       const response = await fetch(
-        `http://127.0.0.1:8000/api/usuarios/usuarios/${user.id}/cambiar_password/`,
+        `${import.meta.env.VITE_API_URL}/usuarios/usuarios/${user.id}/cambiar_password/`,
         {
           method: "POST",
           headers: {
@@ -210,46 +203,35 @@ export default function Perfil() {
         <div className="bg-white rounded-2xl shadow-lg p-0 flex flex-col">
           <button
             onClick={() => setSeccion("datos")}
-            className={`flex items-center gap-3 text-sm md:text-base p-3 rounded-lg transition-all ${
-              seccion === "datos"
-                ? "bg-[#084B83] text-white"
-                : "text-gray-600 hover:bg-gray-100"
-            }`}
+            className={`flex items-center gap-3 text-sm md:text-base p-3 rounded-lg transition-all ${seccion === "datos"
+              ? "bg-[#084B83] text-white"
+              : "text-gray-600 hover:bg-gray-100"
+              }`}
           >
             <User size={18} />
             Mi cuenta
           </button>
           <button
             onClick={() => setSeccion("seguridad")}
-            className={`flex items-center gap-3 text-sm md:text-base p-3 rounded-lg transition-all ${
-              seccion === "seguridad"
-                ? "bg-[#084B83] text-white"
-                : "text-gray-600 hover:bg-gray-100"
-            }`}
+            className={`flex items-center gap-3 text-sm md:text-base p-3 rounded-lg transition-all ${seccion === "seguridad"
+              ? "bg-[#084B83] text-white"
+              : "text-gray-600 hover:bg-gray-100"
+              }`}
           >
             <Lock size={18} />
             Seguridad
           </button>
           <button
             onClick={() => setSeccion("pedidos")}
-            className={`flex items-center gap-3 text-sm md:text-base p-3 rounded-lg transition-all ${
-              seccion === "pedidos"
-                ? "bg-[#084B83] text-white"
-                : "text-gray-600 hover:bg-gray-100"
-            }`}
+            className={`flex items-center gap-3 text-sm md:text-base p-3 rounded-lg transition-all ${seccion === "pedidos"
+              ? "bg-[#084B83] text-white"
+              : "text-gray-600 hover:bg-gray-100"
+              }`}
           >
             <Package size={18} />
             Mis pedidos
           </button>
-          
-          {/* Botón de cerrar sesión */}
-          <button
-            onClick={() => {
-              logout();
-              navigate("/registro");
-            }}
-            className="flex items-center gap-3 text-sm md:text-base p-3 rounded-lg transition-all text-red-600 hover:bg-red-50 border-t mt-2"
-          >
+          <button onClick={() => { logout(); navigate("/registro"); }} className="flex items-center gap-3 text-sm md:text-base p-3 rounded-lg transition-all text-red-600 hover:bg-red-50">
             <i className="fas fa-sign-out-alt"></i>
             Cerrar sesión
           </button>
@@ -259,13 +241,13 @@ export default function Perfil() {
       <main className="flex-1 max-w-3xl">
         {seccion === "datos" && (
           <>
-            <h1 className="text-2xl md:text-4xl font-bold text-[#084B83] mb-6">
+            <h1 className="text-2xl md:text-4xl font-bold text-[#084B83] mb-4">
               Datos personales
             </h1>
-            <form onSubmit={handleGuardar} className="flex flex-col gap-6">
+            <form onSubmit={handleGuardar} className="flex flex-col md:gap-6 gap-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold mb-1">
+                  <label className="block text-sm font-medium text-[#084B83] mb-1">
                     Nombre(s)
                   </label>
                   <input
@@ -274,11 +256,11 @@ export default function Perfil() {
                     value={formData.first_name}
                     onChange={handleChange}
                     placeholder="Ingresá tu nombre"
-                    className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
+                    className="w-full border border-gray-200 bg-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold mb-1">
+                  <label className="block text-sm font-medium text-[#084B83] mb-1">
                     Apellido
                   </label>
                   <input
@@ -287,13 +269,13 @@ export default function Perfil() {
                     value={formData.last_name}
                     onChange={handleChange}
                     placeholder="Ingresá tu apellido"
-                    className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
+                    className="w-full border border-gray-200 bg-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
                   />
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold mb-1">
+                  <label className="block text-sm font-medium text-[#084B83] mb-1">
                     Teléfono
                   </label>
                   <input
@@ -302,11 +284,11 @@ export default function Perfil() {
                     value={formData.telefono}
                     onChange={handleChange}
                     placeholder="Número de teléfono"
-                    className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
+                    className="w-full border border-gray-200 bg-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold mb-1">
+                  <label className="block text-sm font-medium text-[#084B83] mb-1">
                     Correo electrónico
                   </label>
                   <input
@@ -314,7 +296,7 @@ export default function Perfil() {
                     name="email"
                     value={formData.email}
                     readOnly
-                    className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm bg-gray-50 text-gray-500 cursor-not-allowed"
+                    className="w-full border border-gray-200 bg-white rounded-lg px-4 py-3 text-sm text-gray-500 cursor-not-allowed"
                   />
                 </div>
               </div>
@@ -327,15 +309,14 @@ export default function Perfil() {
             </form>
           </>
         )}
-
         {seccion === "seguridad" && (
           <div className="max-w-3xl">
-            <h1 className="text-2xl md:text-4xl font-bold text-[#084B83] mb-6">
+            <h1 className="text-2xl md:text-4xl font-bold text-[#084B83] mb-4">
               Cambiá tu contraseña
             </h1>
-            <form onSubmit={handleCambiarContrasena} className="space-y-6">
+            <form onSubmit={handleCambiarContrasena} className="flex flex-col space-y-4 md:space-y-6">
               <div>
-                <label className="block text-xs font-semibold mb-1">
+                <label className="block text-sm font-medium text-[#084B83] mb-1">
                   Contraseña actual
                 </label>
                 <input
@@ -343,14 +324,14 @@ export default function Perfil() {
                   name="current"
                   value={pwd.current}
                   onChange={handlePwdField}
-                  className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
+                  className="w-full border border-gray-200 bg-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
                   placeholder="Ingresá tu contraseña actual"
                   required
                 />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold mb-1">
+              <div className="md:grid md:grid-cols-2 gap-4 space-y-4 md:space-y-0">
+                <div className="flex flex-col">
+                  <label className="block text-sm font-medium text-[#084B83] mb-1">
                     Nueva contraseña
                   </label>
                   <input
@@ -358,14 +339,14 @@ export default function Perfil() {
                     name="next"
                     value={pwd.next}
                     onChange={handlePwdField}
-                    className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
+                    className="w-full border border-gray-200 bg-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
                     placeholder="Mínimo 8 caracteres"
                     required
                     minLength={8}
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold mb-1">
+                <div className="flex flex-col">
+                  <label className="block text-sm font-medium text-[#084B83] mb-1">
                     Confirmar contraseña
                   </label>
                   <input
@@ -373,7 +354,7 @@ export default function Perfil() {
                     name="confirm"
                     value={pwd.confirm}
                     onChange={handlePwdField}
-                    className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm"
+                    className="w-full border border-gray-200 bg-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
                     placeholder="Repetí la nueva contraseña"
                     required
                   />
@@ -391,12 +372,12 @@ export default function Perfil() {
 
         {seccion === "pedidos" && (
           <div className="w-full">
-            <h1 className="text-2xl md:text-4xl font-bold text-[#084B83] mb-6">
+            <h1 className="text-2xl md:text-4xl font-bold text-[#084B83] mb-4">
               Mis pedidos
             </h1>
             <div className="bg-white rounded-2xl shadow-lg overflow-x-auto">
               <table className="min-w-full text-sm">
-                <thead className="bg-gray-50 text-gray-600">
+                <thead className="bg-white text-gray-600">
                   <tr>
                     <th className="text-left font-semibold px-6 py-3">
                       Pedido ID

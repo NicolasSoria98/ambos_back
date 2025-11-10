@@ -15,8 +15,8 @@ export default function Producto() {
       try {
         setLoading(true);
         const [resProd, resLista] = await Promise.all([
-          fetch(`http://127.0.0.1:8000/api/catalogo/productos/${id}/`),
-          fetch("http://127.0.0.1:8000/api/catalogo/productos/"),
+          fetch(`${import.meta.env.VITE_API_URL}/catalogo/producto/${id}/`),
+          fetch(`${import.meta.env.VITE_API_URL}/catalogo/producto/`),
         ]);
         if (!resProd.ok) throw new Error("No se pudo cargar el producto");
         const prodData = await resProd.json();

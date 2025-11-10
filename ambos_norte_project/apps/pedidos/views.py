@@ -66,12 +66,28 @@ class PedidoViewSet(viewsets.ModelViewSet):
     
     def get_permissions(self):
         """
-        GET: Solo usuarios autenticados pueden ver sus pedidos
-        POST/PUT/DELETE: Solo administradores
+        Permisos por acción:
+        - list/retrieve/create: usuario autenticado
+        - resto (update/partial_update/destroy y acciones admin): admin
         """
-        if self.action in ['list', 'retrieve']:
+        if self.action in ['list', 'retrieve', 'create']:
             return [IsAuthenticated()]
         return [IsAuthenticated(), IsAdminUser()]
+
+    def create(self, request, *args, **kwargs):
+        """
+        Crear pedido desde el cliente usando el serializer de entrada
+        Valida stock, calcula totales y descuenta stock de productos.
+        """
+        try:
+            from .serializers import CrearPedidoSerializer, PedidoSerializer
+            input_serializer = CrearPedidoSerializer(data=request.data, context={'request': request})
+            input_serializer.is_valid(raise_exception=True)
+            pedido = input_serializer.save()
+            output = PedidoSerializer(pedido, context={'request': request}).data
+            return Response(output, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
     
     @action(detail=True, methods=['post'])
     def cambiar_estado(self, request, pk=None):

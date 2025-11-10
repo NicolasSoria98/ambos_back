@@ -59,7 +59,8 @@ export default function Carrito() {
     <section className="min-h-[calc(100vh-6rem)] md:flex md:flex-col md:justify-center md:min-h-[calc(100vh-8rem)] bg-[#F0F6F6] px-8 py-10 md:px-80">
       <h1 className="text-2xl md:text-4xl font-bold text-[#084B83] mb-4">Carrito de compras</h1>
       <div className="bg-white shadow rounded-lg p-4">
-        <table className="min-w-full text-sm">
+        <div className="overflow-x-auto -mx-4 md:mx-0">
+        <table className="min-w-full text-sm table-auto whitespace-nowrap md:whitespace-normal">
           <thead className="border-b text-left text-gray-500">
             <tr>
               <th className="pb-3">Producto</th>
@@ -76,9 +77,9 @@ export default function Carrito() {
             ) : (
               items.map((item) => (
                 <tr key={item.id} className="border-b last:border-none">
-                  <td className="py-4 flex items-center gap-4">
+                  <td className="py-4 flex items-center gap-4 min-w-[220px]">
                     <img src={item.imagen || "https://via.placeholder.com/100"} alt={item.nombre} className="w-8 h-8 md:w-16 md:h-16 rounded-md object-cover" />
-                    <span className="font-medium">{item.nombre}</span>
+                    <span className="font-medium break-words break-all md:break-normal">{item.nombre}</span>
                   </td>
                   <td>
                     <div className="flex items-center gap-2">
@@ -96,6 +97,7 @@ export default function Carrito() {
             )}
           </tbody>
         </table>
+        </div>
         <div className="flex justify-end mt-6 items-center gap-6">
           <p className="text-lg font-semibold">Total: ${Number(total).toLocaleString()}</p>
           <a

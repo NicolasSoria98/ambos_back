@@ -10,7 +10,7 @@ export default function Catalogo() {
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await fetch("http://127.0.0.1:8000/api/catalogo/productos/");
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/catalogo/producto/`);
         if (!res.ok) throw new Error("No se pudo cargar el catálogo");
         const data = await res.json();
         setProductos(Array.isArray(data) ? data : []);
