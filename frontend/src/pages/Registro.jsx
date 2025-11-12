@@ -26,6 +26,15 @@ export default function Registro() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    
+    // Validación especial para el campo de teléfono
+    if (name === "telefono") {
+      // Solo permitir números y máximo 8 dígitos
+      const numericValue = value.replace(/\D/g, '').slice(0, 10);
+      setFormData((prev) => ({ ...prev, [name]: numericValue }));
+      return;
+    }
+    
     setFormData((prev) => ({ ...prev, [name]: value }));
     
     // Auto-generar username desde el email
@@ -53,6 +62,13 @@ export default function Registro() {
         // REGISTRO
         if (formData.password !== formData.password_confirm) {
           alert("Las contraseñas no coinciden");
+          setLoading(false);
+          return;
+        }
+
+        // Validar que el teléfono tenga exactamente 8 dígitos
+        if (formData.telefono.length !== 10) {
+          alert("El teléfono debe tener exactamente 8 dígitos");
           setLoading(false);
           return;
         }
@@ -120,10 +136,12 @@ export default function Registro() {
                 <input
                   type="tel"
                   name="telefono"
-                  placeholder="Número de teléfono"
+                  placeholder="Número de teléfono (10 dígitos)"
                   value={formData.telefono}
                   onChange={handleChange}
                   required
+                  pattern="[0-9]{10}"
+                  title="Debe ingresar exactamente 10 dígitos numéricos"
                   className="w-full bg-gray-100 rounded-full px-6 py-3 text-base mt-4"
                 />
               </div>
