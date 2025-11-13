@@ -11,6 +11,8 @@ import Producto from "./pages/Producto.jsx";
 import Carrito from "./pages/Carrito.jsx";
 import EnvioPago from "./pages/EnvioPago.jsx";
 import CompraExitosa from "./pages/CompraExitosa.jsx";
+import PagoFallido from "./pages/PagoFallido.jsx";        // ✨ AGREGAR ESTA LÍNEA
+import PagoPendiente from "./pages/PagoPendiente.jsx";    // ✨ AGREGAR ESTA LÍNEA
 import Contacto from "./pages/Contacto.jsx";
 import Perfil from "./pages/Perfil.jsx";
 
@@ -96,6 +98,8 @@ function Layout() {
           <Route path="/carrito" element={<Carrito />} />
           <Route path="/enviopago" element={<EnvioPago />} />
           <Route path="/compra-exitosa" element={<CompraExitosa />} />
+          <Route path="/pago-fallido" element={<PagoFallido />} />          {/* ✨ AGREGAR ESTA LÍNEA */}
+          <Route path="/pago-pendiente" element={<PagoPendiente />} />      {/* ✨ AGREGAR ESTA LÍNEA */}
           <Route path="/contacto" element={<Contacto />} />
           
           {/* Perfil - ruta protegida para clientes */}

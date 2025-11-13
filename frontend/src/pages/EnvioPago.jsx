@@ -1,5 +1,12 @@
+/**
+ * EnvioPago.jsx - Página de checkout con integración de MercadoPago
+ * Ubicación: src/pages/EnvioPago.jsx
+ * 
+ * REEMPLAZA el contenido actual con este código
+ */
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import paymentsService from "../services/payments";
 
 export default function EnvioPago() {
   const navigate = useNavigate();
@@ -14,6 +21,9 @@ export default function EnvioPago() {
     notas: "",
   });
   const [metodoEnvio, setMetodoEnvio] = useState("envio");
+  const [metodoPago, setMetodoPago] = useState("mercadopago"); // Nuevo estado
+  const [loading, setLoading] = useState(false); // Estado de carga
+  const [error, setError] = useState(null); // Estado de error
 
   useEffect(() => {
     try {
@@ -68,22 +78,28 @@ export default function EnvioPago() {
   };
 
   const validar = () => {
-    if (!form.nombre || !form.apellido || !form.telefono) return false;
-    if (metodoEnvio === "envio") {
-      if (!form.direccion || !form.ciudad) return false;
+    if (!form.nombre || !form.apellido || !form.telefono || !form.email) {
+      setError("Completá todos los datos requeridos");
+      return false;
     }
+    if (metodoEnvio === "envio") {
+      if (!form.direccion || !form.ciudad) {
+        setError("Completá la dirección de envío");
+        return false;
+      }
+    }
+    setError(null);
     return true;
   };
 
-  const finalizarCompra = async () => {
-    if (!validar()) {
-      alert("Completá los datos requeridos");
-      return;
-    }
+  const finalizarConEfectivo = async () => {
+    if (!validar()) return;
+
     try {
+      setLoading(true);
       const rawToken = localStorage.getItem("authToken");
       const token = rawToken && rawToken !== "undefined" && rawToken !== "null" ? rawToken : null;
-      const metodoPago = "efectivo";
+      
       const pedido = {
         id: Date.now(),
         fecha: new Date().toISOString(),
@@ -94,12 +110,14 @@ export default function EnvioPago() {
           costo: costoEnvio,
         },
         pago: {
-          metodo: metodoPago,
+          metodo: "efectivo",
           estado: "pendiente",
         },
         total: totalConEnvio,
       };
+      
       let storedOrder = pedido;
+      
       try {
         const payload = {
           items: (items || []).map((it) => ({
@@ -122,10 +140,13 @@ export default function EnvioPago() {
           notas: form.notas || "",
           total: totalConEnvio,
         };
+        
         if (!token) {
-          alert("Inicia sesion para finalizar la compra");
+          alert("Inicia sesión para finalizar la compra");
+          setLoading(false);
           return;
         }
+        
         const res = await fetch(`${import.meta.env.VITE_API_URL}/pedidos/pedido/`, {
           method: "POST",
           headers: {
@@ -134,16 +155,27 @@ export default function EnvioPago() {
           },
           body: JSON.stringify(payload),
         });
+        
         if (res.ok) {
           const created = await res.json();
           storedOrder = created || storedOrder;
         } else {
           let msg = "No se pudo registrar el pedido";
-          try { const err = await res.json(); msg = err.detail || JSON.stringify(err); } catch { }
+          try { 
+            const err = await res.json(); 
+            msg = err.detail || JSON.stringify(err); 
+          } catch { }
           alert(msg);
+          setLoading(false);
           return;
         }
-      } catch { }
+      } catch (err) {
+        console.error("Error:", err);
+        alert("Error al procesar el pedido");
+        setLoading(false);
+        return;
+      }
+      
       localStorage.setItem("last_order", JSON.stringify(storedOrder));
       try {
         const rawList = localStorage.getItem("orders_local");
@@ -151,10 +183,138 @@ export default function EnvioPago() {
         const next = [storedOrder, ...Array.isArray(list) ? list : []];
         localStorage.setItem("orders_local", JSON.stringify(next));
       } catch { }
+      
       localStorage.removeItem("cart");
       navigate("/compra-exitosa");
-    } catch {
+    } catch (err) {
+      console.error("Error:", err);
       alert("No se pudo finalizar la compra");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const finalizarConMercadoPago = async () => {
+    if (!validar()) return;
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      const rawToken = localStorage.getItem("authToken");
+      const token = rawToken && rawToken !== "undefined" && rawToken !== "null" ? rawToken : null;
+
+      if (!token) {
+        alert("Inicia sesión para finalizar la compra");
+        setLoading(false);
+        return;
+      }
+
+      // 1. Primero crear el pedido en el backend
+      const payload = {
+        items: (items || []).map((it) => ({
+          producto_id: it.id,
+          cantidad: it.cantidad || 1,
+          precio_unitario: it.precio || 0,
+        })),
+        envio: {
+          metodo: metodoEnvio,
+          costo: costoEnvio,
+          direccion: form.direccion || null,
+          ciudad: form.ciudad || null,
+        },
+        contacto: {
+          nombre: form.nombre,
+          apellido: form.apellido,
+          telefono: form.telefono,
+          email: form.email,
+        },
+        notas: form.notas || "",
+        total: totalConEnvio,
+      };
+
+      console.log("📦 Creando pedido...", payload);
+
+      const resPedido = await fetch(`${import.meta.env.VITE_API_URL}/pedidos/pedido/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!resPedido.ok) {
+        let msg = "No se pudo registrar el pedido";
+        try {
+          const err = await resPedido.json();
+          msg = err.detail || JSON.stringify(err);
+        } catch { }
+        throw new Error(msg);
+      }
+
+      const pedido = await resPedido.json();
+      console.log("✅ Pedido creado:", pedido);
+
+      // 2. Crear preferencia de pago en MercadoPago
+      const preferenceData = {
+        pedido_id: pedido.id,
+        items: items.map((it) => ({
+          title: `${it.nombre}`,
+          quantity: it.cantidad || 1,
+          unit_price: it.precio || 0,
+        })),
+        payer: {
+          name: form.nombre,
+          surname: form.apellido,
+          email: form.email,
+          phone: form.telefono,
+        },
+        frontend_url: window.location.origin, // URL base del frontend
+      };
+
+      console.log("💳 Creando preferencia de pago...", preferenceData);
+
+      const result = await paymentsService.crearPreferencia(preferenceData);
+
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+
+      console.log("✅ Preferencia creada:", result.data);
+
+      // 3. Guardar info del pedido en localStorage
+      localStorage.setItem("last_order", JSON.stringify(pedido));
+      localStorage.setItem("last_preference_id", result.data.preference_id);
+
+      // 4. Limpiar carrito
+      localStorage.removeItem("cart");
+
+      // 5. Redirigir a MercadoPago
+      // En producción usar init_point, en desarrollo usar sandbox_init_point
+      const checkoutUrl = result.data.init_point || result.data.sandbox_init_point;
+
+      if (!checkoutUrl) {
+        throw new Error("No se recibió URL de pago");
+      }
+
+      console.log("🚀 Redirigiendo a MercadoPago:", checkoutUrl);
+
+      // Redirigir al usuario a MercadoPago
+      window.location.href = checkoutUrl;
+
+    } catch (err) {
+      console.error("❌ Error al procesar pago:", err);
+      setError(err.message || "Error al procesar el pago");
+      setLoading(false);
+    }
+  };
+
+  const handleFinalizarCompra = () => {
+    if (metodoPago === "efectivo") {
+      finalizarConEfectivo();
+    } else if (metodoPago === "mercadopago") {
+      finalizarConMercadoPago();
     }
   };
 
@@ -163,8 +323,17 @@ export default function EnvioPago() {
       <h1 className="text-2xl md:text-4xl font-bold text-[#084B83] mb-4">
         Checkout
       </h1>
+
+      {/* Mostrar errores */}
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          {error}
+        </div>
+      )}
+
       <div className="md:grid md:grid-cols-3 md:gap-12">
         <div className="md:col-span-2">
+          {/* Método de envío */}
           <div className="flex flex-wrap items-center gap-4 mb-4 text-sm bg-white rounded-lg p-4 py-3 border border-gray-200">
             <label className="flex items-center gap-2">
               <input
@@ -187,11 +356,55 @@ export default function EnvioPago() {
               Retiro en local (Sin costo)
             </label>
           </div>
-          <form className="space-y-4">
+
+          {/* Método de pago */}
+          <div className="mb-4 bg-white rounded-lg p-4 border border-gray-200">
+            <h3 className="font-semibold text-[#084B83] mb-3">Método de pago</h3>
+            <div className="space-y-3">
+              <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition">
+                <input
+                  type="radio"
+                  name="metodoPago"
+                  value="mercadopago"
+                  checked={metodoPago === "mercadopago"}
+                  onChange={() => setMetodoPago("mercadopago")}
+                  className="w-4 h-4"
+                />
+                <div className="flex items-center gap-2">
+                  <img 
+                    src="https://http2.mlstatic.com/storage/logos-api-admin/a5f047d0-9be0-11ec-aad4-c3381f368aaf-xs@2x.png" 
+                    alt="MercadoPago" 
+                    className="h-6"
+                  />
+                  <div>
+                    <p className="font-medium">MercadoPago</p>
+                    <p className="text-xs text-gray-500">Tarjeta de crédito/débito, efectivo</p>
+                  </div>
+                </div>
+              </label>
+
+              <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition">
+                <input
+                  type="radio"
+                  name="metodoPago"
+                  value="efectivo"
+                  checked={metodoPago === "efectivo"}
+                  onChange={() => setMetodoPago("efectivo")}
+                  className="w-4 h-4"
+                />
+                <div>
+                  <p className="font-medium">Efectivo</p>
+                  <p className="text-xs text-gray-500">Pago contra entrega</p>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
             <div className="grid md:grid-cols-2 gap-4">
               <div className="flex flex-col">
                 <label className="text-sm font-medium text-[#084B83] mb-1">
-                  Nombre(s)
+                  Nombre(s) *
                 </label>
                 <input
                   name="nombre"
@@ -199,13 +412,13 @@ export default function EnvioPago() {
                   value={form.nombre}
                   onChange={onChange}
                   type="text"
-                  className="w-full border border-gray-200 bg-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
+                  className="w-full border border-gray-200 bg-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#084B83]"
                   required
                 />
               </div>
               <div className="flex flex-col">
                 <label className="text-sm font-medium text-[#084B83] mb-1">
-                  Apellido
+                  Apellido *
                 </label>
                 <input
                   name="apellido"
@@ -213,7 +426,7 @@ export default function EnvioPago() {
                   value={form.apellido}
                   onChange={onChange}
                   type="text"
-                  className="w-full border border-gray-200 bg-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
+                  className="w-full border border-gray-200 bg-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#084B83]"
                   required
                 />
               </div>
@@ -222,7 +435,7 @@ export default function EnvioPago() {
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="flex flex-col">
                   <label className="text-sm font-medium text-[#084B83] mb-1">
-                    Ciudad{" "}
+                    Ciudad *{" "}
                     <span className="text-xs font-light text-gray-500">
                       (Sólo Resistencia y Corrientes)
                     </span>
@@ -231,7 +444,7 @@ export default function EnvioPago() {
                     name="ciudad"
                     value={form.ciudad}
                     onChange={onChange}
-                    className="w-full border border-gray-200 bg-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
+                    className="w-full border border-gray-200 bg-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#084B83]"
                     required
                   >
                     <option value="">Seleccionar ciudad</option>
@@ -241,7 +454,7 @@ export default function EnvioPago() {
                 </div>
                 <div className="flex flex-col">
                   <label className="text-sm font-medium text-[#084B83] mb-1">
-                    Dirección
+                    Dirección *
                   </label>
                   <input
                     name="direccion"
@@ -249,7 +462,7 @@ export default function EnvioPago() {
                     value={form.direccion}
                     onChange={onChange}
                     type="text"
-                    className="w-full border border-gray-200 bg-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
+                    className="w-full border border-gray-200 bg-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#084B83]"
                     required
                   />
                 </div>
@@ -258,7 +471,7 @@ export default function EnvioPago() {
             <div className="grid md:grid-cols-2 gap-4">
               <div className="flex flex-col">
                 <label className="text-sm font-medium text-[#084B83] mb-1">
-                  Teléfono
+                  Teléfono *
                 </label>
                 <input
                   name="telefono"
@@ -266,13 +479,13 @@ export default function EnvioPago() {
                   value={form.telefono}
                   onChange={onChange}
                   type="text"
-                  className="w-full border border-gray-200 bg-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
+                  className="w-full border border-gray-200 bg-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#084B83]"
                   required
                 />
               </div>
               <div className="flex flex-col">
                 <label className="text-sm font-medium text-[#084B83] mb-1">
-                  Correo electrónico
+                  Correo electrónico *
                 </label>
                 <input
                   name="email"
@@ -280,7 +493,7 @@ export default function EnvioPago() {
                   value={form.email}
                   onChange={onChange}
                   type="email"
-                  className="w-full border border-gray-200 bg-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
+                  className="w-full border border-gray-200 bg-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#084B83]"
                   required
                 />
               </div>
@@ -296,11 +509,12 @@ export default function EnvioPago() {
                 value={form.notas}
                 onChange={onChange}
                 type="text"
-                  className="w-full border border-gray-200 bg-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
+                className="w-full border border-gray-200 bg-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#084B83]"
               />
             </div>
           </form>
         </div>
+
         <aside className="md:col-span-1 md:flex md:flex-col md:justify-center mb-8 md:mb-0">
           <h2 className="text-xl md:text-2xl font-semibold mb-4 mt-8 md:mt-0 text-[#084B83]">
             Resumen del pedido
@@ -319,7 +533,6 @@ export default function EnvioPago() {
                   {items.map((it) => (
                     <tr key={it.id} className="border-t">
                       <td className="py-2 max-w-[8rem] truncate overflow-hidden text-ellipsis">{it.nombre}</td>
-
                       <td className="py-2 text-right">{it.cantidad || 1}</td>
                       <td className="py-2 text-right">
                         ${Number((it.precio || 0) * (it.cantidad || 1)).toLocaleString()}
@@ -354,10 +567,13 @@ export default function EnvioPago() {
             </div>
           </div>
           <button
-            onClick={finalizarCompra}
-            className="w-full mt-6 uppercase bg-[#084B83] text-white px-8 py-3 rounded-full font-semibold text-sm hover:scale-[1.02] transition-transform duration-200"
+            onClick={handleFinalizarCompra}
+            disabled={loading}
+            className={`w-full mt-6 uppercase bg-[#084B83] text-white px-8 py-3 rounded-full font-semibold text-sm hover:scale-[1.02] transition-transform duration-200 ${
+              loading ? "opacity-50 cursor-not-allowed" : ""
+            }`}
           >
-            Finalizar compra
+            {loading ? "Procesando..." : "Finalizar compra"}
           </button>
         </aside>
       </div>

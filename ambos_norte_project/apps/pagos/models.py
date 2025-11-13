@@ -1,7 +1,3 @@
-"""
-Modelo actualizado de Pago para apps/pagos/models.py
-REEMPLAZA el contenido actual de apps/pagos/models.py con este código
-"""
 from django.db import models
 from apps.pedidos.models import Pedido
 
