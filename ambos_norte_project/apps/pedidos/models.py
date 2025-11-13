@@ -9,8 +9,6 @@ class Pedido(models.Model):
     Pedidos realizados
     """
     ESTADO_CHOICES = [
-        ('pendiente', 'Pendiente'),
-        ('pagado', 'Pagado'),
         ('en_preparacion', 'En Preparación'),
         ('enviado', 'Enviado'),
         ('entregado', 'Entregado'),
@@ -42,7 +40,7 @@ class Pedido(models.Model):
     estado = models.CharField(
         max_length=20, 
         choices=ESTADO_CHOICES, 
-        default='pendiente'
+        default='en_preparacion'
     )
     notas = models.TextField(blank=True, null=True)
     

@@ -72,10 +72,8 @@ const ordersService = {
     return response.data;
   },
 
-  // Estados disponibles
+  // Estados disponibles (ACTUALIZADO - sin 'pendiente' y 'pagado')
   getEstados: () => [
-    { value: 'pendiente', label: 'Pendiente', color: 'gray' },
-    { value: 'pagado', label: 'Pagado', color: 'blue' },
     { value: 'en_preparacion', label: 'En Preparación', color: 'yellow' },
     { value: 'enviado', label: 'Enviado', color: 'purple' },
     { value: 'entregado', label: 'Entregado', color: 'green' },

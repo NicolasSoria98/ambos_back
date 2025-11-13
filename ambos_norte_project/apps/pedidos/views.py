@@ -270,9 +270,10 @@ class PedidoViewSet(viewsets.ModelViewSet):
                     activo=True
                 ).count()
             
-            # Total vendido (solo pedidos activos)
+            # Total vendido (solo pedidos activos y completados)
+            # CAMBIO: Removido 'pagado' de la lista de estados
             total_vendido = Pedido.objects.filter(
-                estado__in=['pagado', 'en_preparacion', 'enviado', 'entregado'],
+                estado__in=['en_preparacion', 'enviado', 'entregado'],
                 activo=True
             ).aggregate(total=Sum('total'))['total'] or 0
             

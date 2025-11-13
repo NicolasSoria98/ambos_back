@@ -1,13 +1,12 @@
 from django.db import models
 from apps.pedidos.models import Pedido
+
 # Create your models here.
 class Pago(models.Model):
     
     ESTADO_CHOICES = [
         ('pendiente', 'Pendiente'),
         ('aprobado', 'Aprobado'),
-        ('rechazado', 'Rechazado'),
-        ('reembolsado', 'Reembolsado'),
     ]
     
     pedido = models.ForeignKey(

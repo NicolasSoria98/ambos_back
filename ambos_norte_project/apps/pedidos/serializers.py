@@ -136,6 +136,7 @@ class CrearPedidoSerializer(serializers.Serializer):
             from datetime import datetime
             numero_pedido = datetime.utcnow().strftime('PN%Y%m%d%H%M%S')
 
+            # Estado por defecto será 'en_preparacion' según el modelo
             pedido = Pedido.objects.create(
                 numero_pedido=numero_pedido,
                 usuario=user,
@@ -144,8 +145,10 @@ class CrearPedidoSerializer(serializers.Serializer):
                 subtotal=subtotal,
                 total=total,
                 notas=notas,
+                # estado se asignará automáticamente como 'en_preparacion' por el default del modelo
             )
 
+            # Crear items del pedido
             for producto, cantidad, precio_unitario, sub in detalles_items:
                 ItemPedido.objects.create(
                     pedido=pedido,
@@ -157,6 +160,15 @@ class CrearPedidoSerializer(serializers.Serializer):
                 )
                 producto.stock = producto.stock - cantidad
                 producto.save(update_fields=['stock'])
+
+            # Crear registro inicial en el historial
+            HistorialEstadoPedido.objects.create(
+                pedido=pedido,
+                estado_anterior=None,
+                estado_nuevo='en_preparacion',
+                usuario_modificador=user,
+                comentario='Pedido creado'
+            )
 
             return pedido
 

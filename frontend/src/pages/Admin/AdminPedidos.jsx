@@ -209,22 +209,22 @@ export default function AdminPedidos() {
               </select>
             </div>
 
-            {/* Resumen rápido */}
+            {/* Resumen rápido - ACTUALIZADO */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
               <div className="bg-gray-50 p-4 rounded-lg">
                 <p className="text-sm text-gray-600">Total Pedidos</p>
                 <p className="text-2xl font-bold text-gray-800">{pedidos.length}</p>
               </div>
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <p className="text-sm text-blue-600">Pendientes</p>
-                <p className="text-2xl font-bold text-blue-800">
-                  {pedidos.filter(p => p.estado_pedido === 'pendiente').length}
-                </p>
-              </div>
               <div className="bg-yellow-50 p-4 rounded-lg">
                 <p className="text-sm text-yellow-600">En Preparación</p>
                 <p className="text-2xl font-bold text-yellow-800">
                   {pedidos.filter(p => p.estado_pedido === 'en_preparacion').length}
+                </p>
+              </div>
+              <div className="bg-purple-50 p-4 rounded-lg">
+                <p className="text-sm text-purple-600">Enviados</p>
+                <p className="text-2xl font-bold text-purple-800">
+                  {pedidos.filter(p => p.estado_pedido === 'enviado').length}
                 </p>
               </div>
               <div className="bg-green-50 p-4 rounded-lg">
