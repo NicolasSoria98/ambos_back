@@ -51,7 +51,6 @@ INSTALLED_APPS = [
     'apps.envios',
     'apps.panel_admin',
     'apps.analytics',
-    'apps.chatbot',
 ]
 
 MIDDLEWARE = [

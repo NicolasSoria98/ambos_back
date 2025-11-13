@@ -2,6 +2,7 @@ from rest_framework import serializers
 from .models import Carrito, ItemCarrito
 from apps.catalogo.serializers import ProductoSerializer
 
+
 class ItemCarritoSerializer(serializers.ModelSerializer):
     
     producto = ProductoSerializer(read_only=True)

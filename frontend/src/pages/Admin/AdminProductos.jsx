@@ -5,25 +5,31 @@ import productsService from '../../services/products';
 export default function AdminProductos() {
   const [productos, setProductos] = useState([]);
   const [categorias, setCategorias] = useState([]);
+  const [tallas, setTallas] = useState([]);
+  const [colores, setColores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategoria, setFilterCategoria] = useState('');
+  
+  // Estado del formulario de producto
   const [formData, setFormData] = useState({
     nombre: '',
     descripcion: '',
-    precio: '',
-    stock: '',
-    talla: '',
-    color: '',
+    precio_base: '',
     material: '',
     categoria: '',
     activo: true,
     destacado: false,
     imagen_principal: null
   });
+
+  // Estado para las variantes (talla + color + stock) - SIN sku ni precio_adicional
+  const [variantes, setVariantes] = useState([
+    { talla: '', color: '', stock: 0, activo: true }
+  ]);
 
   useEffect(() => {
     cargarDatos();
@@ -32,12 +38,16 @@ export default function AdminProductos() {
   const cargarDatos = async () => {
     try {
       setLoading(true);
-      const [productosData, categoriasData] = await Promise.all([
+      const [productosData, categoriasData, tallasData, coloresData] = await Promise.all([
         productsService.getAll(),
-        productsService.getCategories()
+        productsService.getCategories(),
+        productsService.getTallas(),
+        productsService.getColores()
       ]);
       setProductos(productosData);
       setCategorias(categoriasData);
+      setTallas(tallasData);
+      setColores(coloresData);
       setError(null);
     } catch (err) {
       setError('Error al cargar los datos: ' + err.message);
@@ -65,79 +75,150 @@ export default function AdminProductos() {
     }
   };
 
-  const handleSubmit = async (e) => {
-  e.preventDefault();
-  
-  try {
-    const formDataToSend = new FormData();
-    
-    // Agregar campos básicos
-    formDataToSend.append('nombre', formData.nombre);
-    formDataToSend.append('precio', formData.precio);
-    formDataToSend.append('stock', formData.stock);
-    formDataToSend.append('categoria', formData.categoria);
-    formDataToSend.append('activo', formData.activo);
-    formDataToSend.append('destacado', formData.destacado);
-    
-    // Agregar campos opcionales solo si tienen valor
-    if (formData.descripcion) {
-      formDataToSend.append('descripcion', formData.descripcion);
-    }
-    if (formData.talla) {
-      formDataToSend.append('talla', formData.talla);
-    }
-    if (formData.color) {
-      formDataToSend.append('color', formData.color);
-    }
-    if (formData.material) {
-      formDataToSend.append('material', formData.material);
-    }
-    
-    // Agregar imagen solo si es un archivo nuevo
-    if (formData.imagen_principal instanceof File) {
-      formDataToSend.append('imagen_principal', formData.imagen_principal);
-    }
+  // ============ GESTIÓN DE VARIANTES ============
 
-    // Debug: ver qué se está enviando
-    console.log('📤 Datos a enviar:');
-    for (let [key, value] of formDataToSend.entries()) {
-      console.log(`${key}:`, value);
-    }
+  const handleVarianteChange = (index, field, value) => {
+    const nuevasVariantes = [...variantes];
+    nuevasVariantes[index][field] = value;
+    setVariantes(nuevasVariantes);
+  };
 
-    if (editingProduct) {
-      await productsService.update(editingProduct.id, formDataToSend);
-      alert('Producto actualizado correctamente');
+  const agregarVariante = () => {
+    setVariantes([...variantes, { 
+      talla: '', 
+      color: '', 
+      stock: 0,
+      activo: true 
+    }]);
+  };
+
+  const eliminarVariante = (index) => {
+    if (variantes.length > 1) {
+      const nuevasVariantes = variantes.filter((_, i) => i !== index);
+      setVariantes(nuevasVariantes);
     } else {
-      await productsService.create(formDataToSend);
-      alert('Producto creado correctamente');
+      alert('Debe haber al menos una variante');
     }
+  };
 
-    setShowModal(false);
-    resetForm();
-    cargarDatos();
-  } catch (err) {
-    console.error('❌ Error completo:', err);
-    console.error('❌ Response:', err.response?.data);
-    alert('Error al guardar el producto: ' + (err.response?.data?.error || err.message));
-  }
-};
+  // ============ SUBMIT DEL FORMULARIO ============
 
-  const handleEdit = (producto) => {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    try {
+      // Validar que todas las variantes tengan talla y color
+      const variantesValidas = variantes.filter(v => v.talla && v.color);
+      
+      if (variantesValidas.length === 0) {
+        alert('Debes agregar al menos una variante con talla y color');
+        return;
+      }
+
+      // Preparar datos para enviar - SIN sku ni precio_adicional
+      const dataToSend = {
+        nombre: formData.nombre,
+        precio_base: formData.precio_base,
+        categoria: formData.categoria,
+        activo: formData.activo,
+        destacado: formData.destacado,
+        descripcion: formData.descripcion || '',
+        material: formData.material || '',
+        variantes: variantesValidas.map(v => ({
+          talla: parseInt(v.talla),
+          color: parseInt(v.color),
+          stock: parseInt(v.stock) || 0,
+          activo: v.activo !== false
+        }))
+      };
+
+      console.log('📤 Datos a enviar:', dataToSend);
+
+      // Si hay imagen, usar FormData
+      if (formData.imagen_principal instanceof File) {
+        const formDataToSend = new FormData();
+        
+        // Agregar campos básicos
+        formDataToSend.append('nombre', dataToSend.nombre);
+        formDataToSend.append('precio_base', dataToSend.precio_base);
+        formDataToSend.append('categoria', dataToSend.categoria);
+        formDataToSend.append('activo', dataToSend.activo);
+        formDataToSend.append('destacado', dataToSend.destacado);
+        
+        if (dataToSend.descripcion) {
+          formDataToSend.append('descripcion', dataToSend.descripcion);
+        }
+        if (dataToSend.material) {
+          formDataToSend.append('material', dataToSend.material);
+        }
+        
+        // Agregar imagen
+        formDataToSend.append('imagen_principal', formData.imagen_principal);
+        
+        // Agregar variantes como JSON string
+        formDataToSend.append('variantes', JSON.stringify(dataToSend.variantes));
+
+        if (editingProduct) {
+          await productsService.update(editingProduct.id, formDataToSend);
+        } else {
+          await productsService.create(formDataToSend);
+        }
+      } else {
+        // Sin imagen, enviar JSON
+        if (editingProduct) {
+          await productsService.update(editingProduct.id, dataToSend);
+        } else {
+          await productsService.create(dataToSend);
+        }
+      }
+
+      alert(editingProduct ? 'Producto actualizado correctamente' : 'Producto creado correctamente');
+      setShowModal(false);
+      resetForm();
+      cargarDatos();
+    } catch (err) {
+      console.error('❌ Error completo:', err);
+      console.error('❌ Response:', err.response?.data);
+      alert('Error al guardar el producto: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
+  const handleEdit = async (producto) => {
     setEditingProduct(producto);
-    setFormData({
-      nombre: producto.nombre,
-      descripcion: producto.descripcion || '',
-      precio: producto.precio,
-      stock: producto.stock,
-      talla: producto.talla || '',
-      color: producto.color || '',
-      material: producto.material || '',
-      categoria: producto.categoria,
-      activo: producto.activo,
-      destacado: producto.destacado,
-      imagen_principal: null
-    });
-    setShowModal(true);
+    
+    // Cargar datos completos del producto con variantes
+    try {
+      const productoCompleto = await productsService.getById(producto.id);
+      
+      setFormData({
+        nombre: productoCompleto.nombre,
+        descripcion: productoCompleto.descripcion || '',
+        precio_base: productoCompleto.precio_base,
+        material: productoCompleto.material || '',
+        categoria: productoCompleto.categoria,
+        activo: productoCompleto.activo,
+        destacado: productoCompleto.destacado,
+        imagen_principal: null
+      });
+
+      // Cargar variantes existentes - SIN sku ni precio_adicional
+      if (productoCompleto.variantes && productoCompleto.variantes.length > 0) {
+        setVariantes(productoCompleto.variantes.map(v => ({
+          id: v.id,
+          talla: v.talla,
+          color: v.color,
+          stock: v.stock,
+          activo: v.activo
+        })));
+      } else {
+        setVariantes([{ talla: '', color: '', stock: 0, activo: true }]);
+      }
+      
+      setShowModal(true);
+    } catch (err) {
+      alert('Error al cargar los datos del producto: ' + err.message);
+      console.error(err);
+    }
   };
 
   const handleDelete = async (id) => {
@@ -149,21 +230,6 @@ export default function AdminProductos() {
       cargarDatos();
     } catch (err) {
       alert('Error al desactivar el producto: ' + err.message);
-      console.error(err);
-    }
-  };
-
-  const handleStockChange = async (id, cantidad, accion) => {
-    try {
-      if (accion === 'aumentar') {
-        await productsService.increaseStock(id, cantidad);
-      } else {
-        await productsService.reduceStock(id, cantidad);
-      }
-      alert('Stock actualizado correctamente');
-      cargarDatos();
-    } catch (err) {
-      alert('Error al actualizar stock: ' + err.message);
       console.error(err);
     }
   };
@@ -183,16 +249,14 @@ export default function AdminProductos() {
     setFormData({
       nombre: '',
       descripcion: '',
-      precio: '',
-      stock: '',
-      talla: '',
-      color: '',
+      precio_base: '',
       material: '',
       categoria: '',
       activo: true,
       destacado: false,
       imagen_principal: null
     });
+    setVariantes([{ talla: '', color: '', stock: 0, activo: true }]);
     setEditingProduct(null);
   };
 
@@ -229,7 +293,7 @@ export default function AdminProductos() {
               <i className="fas fa-shopping-bag mr-3"></i>
               Gestión de Productos
             </h1>
-            <p className="text-gray-600">Administra el catálogo de productos</p>
+            <p className="text-gray-600">Administra el catálogo de productos con variantes</p>
           </div>
 
           {error && (
@@ -291,7 +355,8 @@ export default function AdminProductos() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Categoría</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Precio</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock Total</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Variantes</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acciones</th>
                   </tr>
@@ -317,7 +382,7 @@ export default function AdminProductos() {
                         <td className="px-6 py-4">
                           <div className="font-medium text-gray-900">{producto.nombre}</div>
                           {producto.destacado && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 mt-1">
                               <i className="fas fa-star mr-1"></i>Destacado
                             </span>
                           )}
@@ -326,15 +391,20 @@ export default function AdminProductos() {
                           {categoria?.nombre || 'Sin categoría'}
                         </td>
                         <td className="px-6 py-4 font-medium text-gray-900">
-                          ${parseFloat(producto.precio).toFixed(2)}
+                          ${parseFloat(producto.precio_base).toFixed(2)}
                         </td>
                         <td className="px-6 py-4">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            producto.stock > 10 ? 'bg-green-100 text-green-800' :
-                            producto.stock > 0 ? 'bg-yellow-100 text-yellow-800' :
+                            producto.stock_total > 10 ? 'bg-green-100 text-green-800' :
+                            producto.stock_total > 0 ? 'bg-yellow-100 text-yellow-800' :
                             'bg-red-100 text-red-800'
                           }`}>
-                            {producto.stock} unidades
+                            {producto.stock_total || 0} unidades
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            {producto.variantes_count || 0} variantes
                           </span>
                         </td>
                         <td className="px-6 py-4">
@@ -388,7 +458,7 @@ export default function AdminProductos() {
       {/* Modal de crear/editar */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-gray-800">
@@ -405,172 +475,232 @@ export default function AdminProductos() {
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Nombre *
-                    </label>
-                    <input
-                      type="text"
-                      name="nombre"
-                      value={formData.nombre}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Descripción
-                    </label>
-                    <textarea
-                      name="descripcion"
-                      value={formData.descripcion}
-                      onChange={handleInputChange}
-                      rows={3}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Categoría *
-                    </label>
-                    <select
-                      name="categoria"
-                      value={formData.categoria}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    >
-                      <option value="">Seleccionar categoría</option>
-                      {categorias.map(cat => (
-                        <option key={cat.id} value={cat.id}>{cat.nombre}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Precio *
-                    </label>
-                    <input
-                      type="number"
-                      name="precio"
-                      value={formData.precio}
-                      onChange={handleInputChange}
-                      step="0.01"
-                      min="0"
-                      required
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Stock *
-                    </label>
-                    <input
-                      type="number"
-                      name="stock"
-                      value={formData.stock}
-                      onChange={handleInputChange}
-                      min="0"
-                      required
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Talla
-                    </label>
-                    <input
-                      type="text"
-                      name="talla"
-                      value={formData.talla}
-                      onChange={handleInputChange}
-                      placeholder="Ej: M, L, XL"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Color
-                    </label>
-                    <input
-                      type="text"
-                      name="color"
-                      value={formData.color}
-                      onChange={handleInputChange}
-                      placeholder="Ej: Blanco, Azul"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Material
-                    </label>
-                    <input
-                      type="text"
-                      name="material"
-                      value={formData.material}
-                      onChange={handleInputChange}
-                      placeholder="Ej: Algodón, Poliéster"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Imagen Principal
-                    </label>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    />
-                    {editingProduct?.imagen_principal && (
-                      <p className="text-sm text-gray-500 mt-2">
-                        Imagen actual: {editingProduct.imagen_principal.split('/').pop()}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-4">
-                    <label className="flex items-center gap-2">
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* INFORMACIÓN BÁSICA */}
+                <div className="border-b pb-4">
+                  <h3 className="text-lg font-semibold text-gray-700 mb-4">Información Básica</h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Nombre *
+                      </label>
                       <input
-                        type="checkbox"
-                        name="activo"
-                        checked={formData.activo}
+                        type="text"
+                        name="nombre"
+                        value={formData.nombre}
                         onChange={handleInputChange}
-                        className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                        required
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                       />
-                      <span className="text-sm font-medium text-gray-700">Activo</span>
-                    </label>
+                    </div>
 
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        name="destacado"
-                        checked={formData.destacado}
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Descripción
+                      </label>
+                      <textarea
+                        name="descripcion"
+                        value={formData.descripcion}
                         onChange={handleInputChange}
-                        className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                        rows={3}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                       />
-                      <span className="text-sm font-medium text-gray-700">Destacado</span>
-                    </label>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Categoría *
+                      </label>
+                      <select
+                        name="categoria"
+                        value={formData.categoria}
+                        onChange={handleInputChange}
+                        required
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      >
+                        <option value="">Seleccionar categoría</option>
+                        {categorias.map(cat => (
+                          <option key={cat.id} value={cat.id}>{cat.nombre}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Precio *
+                      </label>
+                      <input
+                        type="number"
+                        name="precio_base"
+                        value={formData.precio_base}
+                        onChange={handleInputChange}
+                        step="0.01"
+                        min="0"
+                        required
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Material
+                      </label>
+                      <input
+                        type="text"
+                        name="material"
+                        value={formData.material}
+                        onChange={handleInputChange}
+                        placeholder="Ej: Algodón, Poliéster"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Imagen Principal
+                      </label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChange}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      />
+                      {editingProduct?.imagen_principal && (
+                        <p className="text-sm text-gray-500 mt-2">
+                          Imagen actual: {editingProduct.imagen_principal.split('/').pop()}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          name="activo"
+                          checked={formData.activo}
+                          onChange={handleInputChange}
+                          className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                        />
+                        <span className="text-sm font-medium text-gray-700">Activo</span>
+                      </label>
+
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          name="destacado"
+                          checked={formData.destacado}
+                          onChange={handleInputChange}
+                          className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                        />
+                        <span className="text-sm font-medium text-gray-700">Destacado</span>
+                      </label>
+                    </div>
                   </div>
                 </div>
 
+                {/* VARIANTES (TALLAS Y COLORES) */}
+                <div className="border-b pb-4">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-semibold text-gray-700">
+                      Variantes (Tallas y Colores)
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={agregarVariante}
+                      className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2"
+                    >
+                      <i className="fas fa-plus"></i>
+                      Agregar Variante
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    {variantes.map((variante, index) => (
+                      <div key={index} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                        <div className="flex justify-between items-start mb-3">
+                          <span className="text-sm font-medium text-gray-700">
+                            Variante #{index + 1}
+                          </span>
+                          {variantes.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => eliminarVariante(index)}
+                              className="text-red-600 hover:text-red-800"
+                              title="Eliminar variante"
+                            >
+                              <i className="fas fa-trash"></i>
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                              Talla *
+                            </label>
+                            <select
+                              value={variante.talla}
+                              onChange={(e) => handleVarianteChange(index, 'talla', e.target.value)}
+                              required
+                              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            >
+                              <option value="">Seleccionar</option>
+                              {tallas.map(t => (
+                                <option key={t.id} value={t.id}>{t.nombre}</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                              Color *
+                            </label>
+                            <select
+                              value={variante.color}
+                              onChange={(e) => handleVarianteChange(index, 'color', e.target.value)}
+                              required
+                              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            >
+                              <option value="">Seleccionar</option>
+                              {colores.map(c => (
+                                <option key={c.id} value={c.id}>{c.nombre}</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                              Stock *
+                            </label>
+                            <input
+                              type="number"
+                              value={variante.stock}
+                              onChange={(e) => handleVarianteChange(index, 'stock', e.target.value)}
+                              min="0"
+                              required
+                              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {variantes.length === 0 && (
+                    <div className="text-center py-8 text-gray-500">
+                      <i className="fas fa-box-open text-3xl mb-2"></i>
+                      <p>No hay variantes agregadas</p>
+                      <p className="text-sm">Haz clic en "Agregar Variante" para comenzar</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* BOTONES DE ACCIÓN */}
                 <div className="flex gap-4 pt-4">
                   <button
                     type="submit"
-                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg transition"
+                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg transition font-medium"
                   >
                     {editingProduct ? 'Actualizar' : 'Crear'} Producto
                   </button>
@@ -580,7 +710,7 @@ export default function AdminProductos() {
                       setShowModal(false);
                       resetForm();
                     }}
-                    className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 rounded-lg transition"
+                    className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 rounded-lg transition font-medium"
                   >
                     Cancelar
                   </button>

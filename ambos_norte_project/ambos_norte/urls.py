@@ -27,7 +27,6 @@ urlpatterns = [
     path('api/envios/', include('apps.envios.urls')),
     path('api/pagos/', include('apps.pagos.urls')),
     path('api/carrito/', include('apps.carrito.urls')),
-    path('api/chatbot/', include('apps.chatbot.urls')),
     path('dashboard/', include('apps.panel_admin.urls')),
     path('api/auth/', include('apps.usuarios.auth_urls')),
     path('api/analytics/', include('apps.analytics.urls')),
