@@ -21,10 +21,29 @@ class ColorSerializer(serializers.ModelSerializer):
         fields = ["id", "nombre", "codigo_hex", "activo"]
 
 
+class ImagenProductoSerializer(serializers.ModelSerializer):
+    imagen_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ImagenProducto
+        fields = ["id", "producto", "orden", "imagen", "imagen_url", "variante"]
+
+    def get_imagen_url(self, obj):
+        try:
+            request = self.context.get("request")
+            if obj.imagen and hasattr(obj.imagen, "url"):
+                url = obj.imagen.url
+                return request.build_absolute_uri(url) if request else url
+        except Exception:
+            pass
+        return None
+
+
 class ProductoVarianteSerializer(serializers.ModelSerializer):
     talla_nombre = serializers.CharField(source='talla.nombre', read_only=True)
     color_nombre = serializers.CharField(source='color.nombre', read_only=True)
     precio_final = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    imagenes = ImagenProductoSerializer(many=True, read_only=True)  # NUEVO: Imágenes de la variante
     
     class Meta:
         model = ProductoVariante
@@ -37,27 +56,10 @@ class ProductoVarianteSerializer(serializers.ModelSerializer):
             "stock",
             "precio_final",
             "activo",
-            "fecha_creacion"
+            "fecha_creacion",
+            "imagenes"  # NUEVO
         ]
         read_only_fields = ['precio_final', 'fecha_creacion']
-
-
-class ImagenProductoSerializer(serializers.ModelSerializer):
-    imagen_url = serializers.SerializerMethodField()
-
-    class Meta:
-        model = ImagenProducto
-        fields = ["id", "orden", "imagen", "imagen_url"]
-
-    def get_imagen_url(self, obj):
-        try:
-            request = self.context.get("request")
-            if obj.imagen and hasattr(obj.imagen, "url"):
-                url = obj.imagen.url
-                return request.build_absolute_uri(url) if request else url
-        except Exception:
-            pass
-        return None
 
 
 class ProductoListSerializer(serializers.ModelSerializer):
@@ -103,7 +105,7 @@ class ProductoDetailSerializer(serializers.ModelSerializer):
     """Serializer para detalle de producto - vista completa con variantes"""
     categoria_nombre = serializers.CharField(source='categoria.nombre', read_only=True)
     imagen_principal_url = serializers.SerializerMethodField()
-    imagenes = ImagenProductoSerializer(many=True, read_only=True)
+    imagenes = serializers.SerializerMethodField()  # MODIFICADO: Ahora filtramos imágenes generales
     variantes = ProductoVarianteSerializer(many=True, read_only=True)
     stock_total = serializers.IntegerField(read_only=True)
     stock_disponible = serializers.BooleanField(read_only=True)
@@ -138,6 +140,12 @@ class ProductoDetailSerializer(serializers.ModelSerializer):
         except Exception:
             pass
         return None
+    
+    def get_imagenes(self, obj):
+        """Retorna solo las imágenes generales (sin variante asignada)"""
+        request = self.context.get("request")
+        imagenes_generales = obj.imagenes.filter(variante__isnull=True)
+        return ImagenProductoSerializer(imagenes_generales, many=True, context={'request': request}).data
 
 
 class ProductoCreateUpdateSerializer(serializers.ModelSerializer):
@@ -221,6 +229,9 @@ class ProductoCreateUpdateSerializer(serializers.ModelSerializer):
         for variante_data in variantes_data:
             print(f"➕ Creando variante: {variante_data}")
             
+            # Separar datos de imágenes si existen
+            imagenes_data = variante_data.pop('imagenes', [])
+            
             # Convertir IDs a instancias de modelo
             talla_id = variante_data.pop('talla')
             color_id = variante_data.pop('color')
@@ -235,6 +246,18 @@ class ProductoCreateUpdateSerializer(serializers.ModelSerializer):
                 **variante_data
             )
             print(f"✅ Variante creada: {variante.id}")
+            
+            # Crear imágenes asociadas a la variante (si vienen en el JSON)
+            for imagen_data in imagenes_data:
+                if isinstance(imagen_data, dict) and 'id' in imagen_data:
+                    # Si viene un ID, asociar imagen existente a la variante
+                    try:
+                        imagen = ImagenProducto.objects.get(id=imagen_data['id'], producto=producto)
+                        imagen.variante = variante
+                        imagen.save()
+                        print(f"✅ Imagen {imagen.id} asociada a variante {variante.id}")
+                    except ImagenProducto.DoesNotExist:
+                        print(f"⚠️ Imagen {imagen_data['id']} no encontrada")
         
         return producto
 
@@ -261,6 +284,9 @@ class ProductoCreateUpdateSerializer(serializers.ModelSerializer):
             for variante_data in variantes_data:
                 print(f"➕ Creando variante: {variante_data}")
                 
+                # Separar datos de imágenes si existen
+                imagenes_data = variante_data.pop('imagenes', [])
+                
                 # Convertir IDs a instancias de modelo
                 talla_id = variante_data.pop('talla')
                 color_id = variante_data.pop('color')
@@ -275,6 +301,17 @@ class ProductoCreateUpdateSerializer(serializers.ModelSerializer):
                     **variante_data
                 )
                 print(f"✅ Variante creada: {variante.id}")
+                
+                # Crear imágenes asociadas a la variante
+                for imagen_data in imagenes_data:
+                    if isinstance(imagen_data, dict) and 'id' in imagen_data:
+                        try:
+                            imagen = ImagenProducto.objects.get(id=imagen_data['id'], producto=instance)
+                            imagen.variante = variante
+                            imagen.save()
+                            print(f"✅ Imagen {imagen.id} asociada a variante {variante.id}")
+                        except ImagenProducto.DoesNotExist:
+                            print(f"⚠️ Imagen {imagen_data['id']} no encontrada")
         
         return instance
 

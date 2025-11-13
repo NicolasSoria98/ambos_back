@@ -26,9 +26,16 @@ export default function AdminProductos() {
     imagen_principal: null
   });
 
-  // Estado para las variantes (talla + color + stock) - SIN sku ni precio_adicional
+  // Estado para las variantes con imágenes
   const [variantes, setVariantes] = useState([
-    { talla: '', color: '', stock: 0, activo: true }
+    { 
+      talla: '', 
+      color: '', 
+      stock: 0, 
+      activo: true,
+      imagenes: [],  // Array de archivos File
+      imagenesExistentes: [] // Array de URLs de imágenes ya subidas
+    }
   ]);
 
   useEffect(() => {
@@ -83,12 +90,43 @@ export default function AdminProductos() {
     setVariantes(nuevasVariantes);
   };
 
+  const handleVarianteImagenesChange = (index, files) => {
+    const nuevasVariantes = [...variantes];
+    // Convertir FileList a Array y agregar a las imágenes existentes
+    const nuevasImagenes = Array.from(files);
+    nuevasVariantes[index].imagenes = [...nuevasVariantes[index].imagenes, ...nuevasImagenes];
+    setVariantes(nuevasVariantes);
+  };
+
+  const eliminarImagenVariante = (varianteIndex, imagenIndex) => {
+    const nuevasVariantes = [...variantes];
+    nuevasVariantes[varianteIndex].imagenes.splice(imagenIndex, 1);
+    setVariantes(nuevasVariantes);
+  };
+
+  const eliminarImagenExistenteVariante = async (varianteIndex, imagenId) => {
+    if (!window.confirm('¿Estás seguro de eliminar esta imagen?')) return;
+    
+    try {
+      await productsService.deleteImagen(imagenId);
+      const nuevasVariantes = [...variantes];
+      nuevasVariantes[varianteIndex].imagenesExistentes = 
+        nuevasVariantes[varianteIndex].imagenesExistentes.filter(img => img.id !== imagenId);
+      setVariantes(nuevasVariantes);
+      alert('Imagen eliminada correctamente');
+    } catch (err) {
+      alert('Error al eliminar la imagen: ' + err.message);
+    }
+  };
+
   const agregarVariante = () => {
     setVariantes([...variantes, { 
       talla: '', 
       color: '', 
       stock: 0,
-      activo: true 
+      activo: true,
+      imagenes: [],
+      imagenesExistentes: []
     }]);
   };
 
@@ -115,7 +153,7 @@ export default function AdminProductos() {
         return;
       }
 
-      // Preparar datos para enviar - SIN sku ni precio_adicional
+      // PASO 1: Crear/actualizar el producto sin variantes primero
       const dataToSend = {
         nombre: formData.nombre,
         precio_base: formData.precio_base,
@@ -124,51 +162,110 @@ export default function AdminProductos() {
         destacado: formData.destacado,
         descripcion: formData.descripcion || '',
         material: formData.material || '',
-        variantes: variantesValidas.map(v => ({
+      };
+
+      console.log('📤 Paso 1: Guardando producto...');
+
+      let productoId;
+      
+      // Si hay imagen principal, usar FormData
+      if (formData.imagen_principal instanceof File) {
+        const formDataToSend = new FormData();
+        
+        Object.keys(dataToSend).forEach(key => {
+          formDataToSend.append(key, dataToSend[key]);
+        });
+        
+        formDataToSend.append('imagen_principal', formData.imagen_principal);
+        formDataToSend.append('variantes', JSON.stringify(
+          variantesValidas.map(v => ({
+            talla: parseInt(v.talla),
+            color: parseInt(v.color),
+            stock: parseInt(v.stock) || 0,
+            activo: v.activo !== false
+          }))
+        ));
+
+        const productoCreado = editingProduct 
+          ? await productsService.update(editingProduct.id, formDataToSend)
+          : await productsService.create(formDataToSend);
+        
+        productoId = productoCreado.id;
+      } else {
+        // Sin imagen principal, enviar JSON con variantes
+        dataToSend.variantes = variantesValidas.map(v => ({
           talla: parseInt(v.talla),
           color: parseInt(v.color),
           stock: parseInt(v.stock) || 0,
           activo: v.activo !== false
-        }))
-      };
+        }));
 
-      console.log('📤 Datos a enviar:', dataToSend);
+        const productoCreado = editingProduct 
+          ? await productsService.update(editingProduct.id, dataToSend)
+          : await productsService.create(dataToSend);
+        
+        productoId = productoCreado.id;
+      }
 
-      // Si hay imagen, usar FormData
-      if (formData.imagen_principal instanceof File) {
-        const formDataToSend = new FormData();
+      console.log('✅ Producto guardado:', productoId);
+
+      // PASO 2: Obtener las variantes creadas del producto
+      console.log('📤 Paso 2: Obteniendo variantes creadas...');
+      const productoCompleto = await productsService.getById(productoId);
+      const variantesCreadas = productoCompleto.variantes;
+
+      console.log('✅ Variantes obtenidas:', variantesCreadas);
+
+      // PASO 3: Subir imágenes para cada variante que tenga
+      console.log('📤 Paso 3: Subiendo imágenes de variantes...');
+      
+      for (let i = 0; i < variantesValidas.length; i++) {
+        const varianteLocal = variantesValidas[i];
         
-        // Agregar campos básicos
-        formDataToSend.append('nombre', dataToSend.nombre);
-        formDataToSend.append('precio_base', dataToSend.precio_base);
-        formDataToSend.append('categoria', dataToSend.categoria);
-        formDataToSend.append('activo', dataToSend.activo);
-        formDataToSend.append('destacado', dataToSend.destacado);
-        
-        if (dataToSend.descripcion) {
-          formDataToSend.append('descripcion', dataToSend.descripcion);
+        // Encontrar la variante creada correspondiente
+        const varianteCreada = variantesCreadas.find(vc => 
+          vc.talla === parseInt(varianteLocal.talla) && 
+          vc.color === parseInt(varianteLocal.color)
+        );
+
+        if (!varianteCreada) {
+          console.warn(`⚠️ No se encontró variante creada para talla ${varianteLocal.talla} y color ${varianteLocal.color}`);
+          continue;
         }
-        if (dataToSend.material) {
-          formDataToSend.append('material', dataToSend.material);
-        }
-        
-        // Agregar imagen
-        formDataToSend.append('imagen_principal', formData.imagen_principal);
-        
-        // Agregar variantes como JSON string
-        formDataToSend.append('variantes', JSON.stringify(dataToSend.variantes));
 
-        if (editingProduct) {
-          await productsService.update(editingProduct.id, formDataToSend);
+        console.log(`🔍 Variante encontrada:`, {
+          id: varianteCreada.id,
+          talla: varianteLocal.talla,
+          color: varianteLocal.color,
+          imagenes: varianteLocal.imagenes.length
+        });
+
+        // Subir cada imagen de esta variante
+        if (varianteLocal.imagenes && varianteLocal.imagenes.length > 0) {
+          for (let j = 0; j < varianteLocal.imagenes.length; j++) {
+            const imagenFile = varianteLocal.imagenes[j];
+            
+            console.log(`📷 Subiendo imagen ${j + 1}/${varianteLocal.imagenes.length} para variante ${varianteCreada.id}...`);
+            console.log(`   - Producto ID: ${productoId}`);
+            console.log(`   - Variante ID: ${varianteCreada.id}`);
+            console.log(`   - Archivo: ${imagenFile.name}`);
+            
+            try {
+              const resultado = await productsService.uploadImagen({
+                producto: productoId,
+                variante: varianteCreada.id,
+                imagen: imagenFile,
+                orden: j + 1
+              });
+              
+              console.log(`✅ Imagen ${j + 1} subida correctamente:`, resultado);
+            } catch (imgErr) {
+              console.error(`❌ Error al subir imagen ${j + 1}:`, imgErr);
+              console.error(`❌ Response:`, imgErr.response?.data);
+            }
+          }
         } else {
-          await productsService.create(formDataToSend);
-        }
-      } else {
-        // Sin imagen, enviar JSON
-        if (editingProduct) {
-          await productsService.update(editingProduct.id, dataToSend);
-        } else {
-          await productsService.create(dataToSend);
+          console.log(`ℹ️ Variante ${varianteCreada.id} no tiene imágenes para subir`);
         }
       }
 
@@ -201,17 +298,26 @@ export default function AdminProductos() {
         imagen_principal: null
       });
 
-      // Cargar variantes existentes - SIN sku ni precio_adicional
+      // Cargar variantes existentes con sus imágenes
       if (productoCompleto.variantes && productoCompleto.variantes.length > 0) {
         setVariantes(productoCompleto.variantes.map(v => ({
           id: v.id,
           talla: v.talla,
           color: v.color,
           stock: v.stock,
-          activo: v.activo
+          activo: v.activo,
+          imagenes: [], // Nuevas imágenes a subir
+          imagenesExistentes: v.imagenes || [] // Imágenes ya subidas
         })));
       } else {
-        setVariantes([{ talla: '', color: '', stock: 0, activo: true }]);
+        setVariantes([{ 
+          talla: '', 
+          color: '', 
+          stock: 0, 
+          activo: true, 
+          imagenes: [], 
+          imagenesExistentes: [] 
+        }]);
       }
       
       setShowModal(true);
@@ -256,7 +362,14 @@ export default function AdminProductos() {
       destacado: false,
       imagen_principal: null
     });
-    setVariantes([{ talla: '', color: '', stock: 0, activo: true }]);
+    setVariantes([{ 
+      talla: '', 
+      color: '', 
+      stock: 0, 
+      activo: true, 
+      imagenes: [], 
+      imagenesExistentes: [] 
+    }]);
     setEditingProduct(null);
   };
 
@@ -293,7 +406,7 @@ export default function AdminProductos() {
               <i className="fas fa-shopping-bag mr-3"></i>
               Gestión de Productos
             </h1>
-            <p className="text-gray-600">Administra el catálogo de productos con variantes</p>
+            <p className="text-gray-600">Administra el catálogo de productos con variantes e imágenes</p>
           </div>
 
           {error && (
@@ -458,7 +571,7 @@ export default function AdminProductos() {
       {/* Modal de crear/editar */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-gray-800">
@@ -599,11 +712,11 @@ export default function AdminProductos() {
                   </div>
                 </div>
 
-                {/* VARIANTES (TALLAS Y COLORES) */}
+                {/* VARIANTES (TALLAS Y COLORES CON IMÁGENES) */}
                 <div className="border-b pb-4">
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-semibold text-gray-700">
-                      Variantes (Tallas y Colores)
+                      Variantes (Tallas, Colores e Imágenes)
                     </h3>
                     <button
                       type="button"
@@ -615,26 +728,27 @@ export default function AdminProductos() {
                     </button>
                   </div>
 
-                  <div className="space-y-4">
+                  <div className="space-y-6">
                     {variantes.map((variante, index) => (
-                      <div key={index} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                        <div className="flex justify-between items-start mb-3">
-                          <span className="text-sm font-medium text-gray-700">
+                      <div key={index} className="bg-gray-50 p-4 rounded-lg border-2 border-gray-200">
+                        <div className="flex justify-between items-start mb-4">
+                          <span className="text-sm font-semibold text-gray-700 bg-indigo-100 px-3 py-1 rounded-full">
                             Variante #{index + 1}
                           </span>
                           {variantes.length > 1 && (
                             <button
                               type="button"
                               onClick={() => eliminarVariante(index)}
-                              className="text-red-600 hover:text-red-800"
+                              className="text-red-600 hover:text-red-800 bg-red-50 px-3 py-1 rounded-lg"
                               title="Eliminar variante"
                             >
-                              <i className="fas fa-trash"></i>
+                              <i className="fas fa-trash mr-1"></i>
+                              Eliminar
                             </button>
                           )}
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                           <div>
                             <label className="block text-xs font-medium text-gray-600 mb-1">
                               Talla *
@@ -683,6 +797,83 @@ export default function AdminProductos() {
                             />
                           </div>
                         </div>
+
+                        {/* IMÁGENES DE LA VARIANTE */}
+                        <div className="bg-white p-4 rounded-lg border border-gray-200">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <i className="fas fa-images mr-2"></i>
+                            Imágenes de esta variante
+                          </label>
+                          
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            onChange={(e) => handleVarianteImagenesChange(index, e.target.files)}
+                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent mb-3"
+                          />
+
+                          {/* Preview de imágenes existentes (al editar) */}
+                          {variante.imagenesExistentes && variante.imagenesExistentes.length > 0 && (
+                            <div className="mb-3">
+                              <p className="text-xs text-gray-600 mb-2">Imágenes actuales:</p>
+                              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                                {variante.imagenesExistentes.map((img, imgIndex) => (
+                                  <div key={imgIndex} className="relative group">
+                                    <img
+                                      src={img.imagen_url}
+                                      alt={`Variante ${index + 1} - Imagen ${imgIndex + 1}`}
+                                      className="w-full h-20 object-cover rounded border"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => eliminarImagenExistenteVariante(index, img.id)}
+                                      className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition text-xs"
+                                      title="Eliminar"
+                                    >
+                                      <i className="fas fa-times"></i>
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Preview de nuevas imágenes */}
+                          {variante.imagenes && variante.imagenes.length > 0 && (
+                            <div>
+                              <p className="text-xs text-gray-600 mb-2">Nuevas imágenes a subir:</p>
+                              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                                {variante.imagenes.map((imagen, imgIndex) => (
+                                  <div key={imgIndex} className="relative group">
+                                    <img
+                                      src={URL.createObjectURL(imagen)}
+                                      alt={`Preview ${imgIndex + 1}`}
+                                      className="w-full h-20 object-cover rounded border border-green-500"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => eliminarImagenVariante(index, imgIndex)}
+                                      className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition text-xs"
+                                      title="Quitar"
+                                    >
+                                      <i className="fas fa-times"></i>
+                                    </button>
+                                    <div className="absolute bottom-1 left-1 bg-green-600 text-white text-xs px-1 rounded">
+                                      Nuevo
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {!variante.imagenes?.length && !variante.imagenesExistentes?.length && (
+                            <p className="text-xs text-gray-500 text-center py-4">
+                              No hay imágenes para esta variante
+                            </p>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -702,6 +893,7 @@ export default function AdminProductos() {
                     type="submit"
                     className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg transition font-medium"
                   >
+                    <i className="fas fa-save mr-2"></i>
                     {editingProduct ? 'Actualizar' : 'Crear'} Producto
                   </button>
                   <button
@@ -712,6 +904,7 @@ export default function AdminProductos() {
                     }}
                     className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 rounded-lg transition font-medium"
                   >
+                    <i className="fas fa-times mr-2"></i>
                     Cancelar
                   </button>
                 </div>

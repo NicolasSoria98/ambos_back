@@ -179,6 +179,76 @@ const productsService = {
     const response = await api.post(`/catalogo/variante/${varianteId}/aumentar_stock/`, { cantidad });
     return response.data;
   },
+
+  // Asociar imagen existente a variante
+  asociarImagenAVariante: async (varianteId, imagenId) => {
+    const response = await api.post(`/catalogo/variante/${varianteId}/asociar_imagen/`, { imagen_id: imagenId });
+    return response.data;
+  },
+
+  // Desasociar imagen de variante
+  desasociarImagenDeVariante: async (varianteId, imagenId) => {
+    const response = await api.post(`/catalogo/variante/${varianteId}/desasociar_imagen/`, { imagen_id: imagenId });
+    return response.data;
+  },
+
+  // ============ IMÁGENES ============
+  
+  // Obtener imágenes de un producto
+  getImagenes: async (productoId, soloGenerales = false) => {
+    const params = { producto: productoId };
+    if (soloGenerales) {
+      params.solo_generales = 'true';
+    }
+    const response = await api.get('/catalogo/imagen-producto/', { params });
+    return response.data;
+  },
+
+  // Subir imagen (general o de variante)
+  uploadImagen: async (imagenData) => {
+    const formData = new FormData();
+    
+    // IMPORTANTE: Convertir a string si es necesario
+    formData.append('producto', String(imagenData.producto));
+    formData.append('imagen', imagenData.imagen);
+    formData.append('orden', imagenData.orden || 0);
+    
+    if (imagenData.variante) {
+      formData.append('variante', String(imagenData.variante));
+    }
+
+    console.log('📤 Subiendo imagen con datos:', {
+      producto: imagenData.producto,
+      variante: imagenData.variante,
+      orden: imagenData.orden,
+      imagen: imagenData.imagen.name
+    });
+
+    const response = await api.post('/catalogo/imagen-producto/', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+    return response.data;
+  },
+
+  // Eliminar imagen
+  deleteImagen: async (imagenId) => {
+    const response = await api.delete(`/catalogo/imagen-producto/${imagenId}/`);
+    return response.data;
+  },
+
+  // Asociar imagen a variante
+  asociarImagenVariante: async (imagenId, varianteId) => {
+    const response = await api.post(`/catalogo/imagen-producto/${imagenId}/asociar_variante/`, { variante_id: varianteId });
+    return response.data;
+  },
+
+  // Desasociar imagen de variante
+  desasociarImagenVariante: async (imagenId) => {
+    const response = await api.post(`/catalogo/imagen-producto/${imagenId}/desasociar_variante/`);
+    return response.data;
+  },
 };
 
 export default productsService;

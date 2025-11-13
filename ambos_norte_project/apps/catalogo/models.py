@@ -181,6 +181,16 @@ class ImagenProducto(models.Model):
     imagen = models.ImageField(upload_to='productos/galeria/')
     orden = models.IntegerField(default=0)
     
+    # NUEVO CAMPO: Permite asociar imágenes a variantes específicas
+    variante = models.ForeignKey(
+        ProductoVariante,
+        on_delete=models.CASCADE,
+        related_name='imagenes',
+        blank=True,
+        null=True,
+        help_text="Si se asigna, esta imagen pertenece específicamente a esta variante. Si es NULL, es una imagen general del producto."
+    )
+    
     class Meta:
         db_table = 'imagenes_producto'
         verbose_name = 'Imagen de Producto'
@@ -188,4 +198,11 @@ class ImagenProducto(models.Model):
         ordering = ['orden']
     
     def __str__(self):
-        return f"Imagen {self.orden} - {self.producto.nombre}"
+        if self.variante:
+            return f"Imagen {self.orden} - {self.producto.nombre} ({self.variante.talla.nombre}/{self.variante.color.nombre})"
+        return f"Imagen {self.orden} - {self.producto.nombre} (General)"
+    
+    def clean(self):
+        """Validación para asegurar consistencia"""
+        if self.variante and self.variante.producto != self.producto:
+            raise ValidationError("La variante debe pertenecer al mismo producto")

@@ -136,7 +136,7 @@ class ProductoViewSet(viewsets.ModelViewSet):
             except (TypeError, ValueError):
                 pass
 
-        return queryset.select_related('categoria').prefetch_related('imagenes', 'variantes', 'variantes__talla', 'variantes__color')
+        return queryset.select_related('categoria').prefetch_related('imagenes', 'variantes', 'variantes__talla', 'variantes__color', 'variantes__imagenes')
     
     def get_permissions(self):
         """
@@ -326,7 +326,7 @@ class ProductoVarianteViewSet(viewsets.ModelViewSet):
         if not self.request.user.is_staff:
             queryset = queryset.filter(activo=True, producto__activo=True)
         
-        return queryset.select_related('producto', 'talla', 'color')
+        return queryset.select_related('producto', 'talla', 'color').prefetch_related('imagenes')
     
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
@@ -389,6 +389,74 @@ class ProductoVarianteViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+    @action(detail=True, methods=['post'])
+    def asociar_imagen(self, request, pk=None):
+        """
+        Asocia una imagen existente a una variante
+        POST /api/catalogo/variante/{id}/asociar_imagen/
+        Body: { "imagen_id": 123 }
+        """
+        variante = self.get_object()
+        imagen_id = request.data.get('imagen_id')
+        
+        if not imagen_id:
+            return Response(
+                {'error': 'Se requiere el ID de la imagen'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            imagen = ImagenProducto.objects.get(
+                id=imagen_id,
+                producto=variante.producto
+            )
+            imagen.variante = variante
+            imagen.save()
+            
+            return Response({
+                'mensaje': 'Imagen asociada correctamente a la variante',
+                'imagen': ImagenProductoSerializer(imagen, context={'request': request}).data
+            })
+        except ImagenProducto.DoesNotExist:
+            return Response(
+                {'error': 'Imagen no encontrada o no pertenece a este producto'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    @action(detail=True, methods=['post'])
+    def desasociar_imagen(self, request, pk=None):
+        """
+        Desasocia una imagen de una variante (la hace general del producto)
+        POST /api/catalogo/variante/{id}/desasociar_imagen/
+        Body: { "imagen_id": 123 }
+        """
+        variante = self.get_object()
+        imagen_id = request.data.get('imagen_id')
+        
+        if not imagen_id:
+            return Response(
+                {'error': 'Se requiere el ID de la imagen'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            imagen = ImagenProducto.objects.get(
+                id=imagen_id,
+                variante=variante
+            )
+            imagen.variante = None
+            imagen.save()
+            
+            return Response({
+                'mensaje': 'Imagen desasociada correctamente',
+                'imagen': ImagenProductoSerializer(imagen, context={'request': request}).data
+            })
+        except ImagenProducto.DoesNotExist:
+            return Response(
+                {'error': 'Imagen no encontrada o no pertenece a esta variante'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
 
 class ImagenProductoViewSet(viewsets.ModelViewSet):
     """
@@ -409,12 +477,70 @@ class ImagenProductoViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         """
-        Filtra imágenes por producto si se proporciona el parámetro
+        Filtra imágenes por producto o variante si se proporcionan los parámetros
         """
         queryset = ImagenProducto.objects.all()
         producto_id = self.request.query_params.get('producto', None)
+        variante_id = self.request.query_params.get('variante', None)
         
         if producto_id:
             queryset = queryset.filter(producto_id=producto_id)
         
-        return queryset.order_by('orden')
+        if variante_id:
+            queryset = queryset.filter(variante_id=variante_id)
+        
+        # Filtrar solo imágenes generales (sin variante)
+        solo_generales = self.request.query_params.get('solo_generales', None)
+        if solo_generales and solo_generales.lower() == 'true':
+            queryset = queryset.filter(variante__isnull=True)
+        
+        return queryset.select_related('producto', 'variante').order_by('orden')
+    
+    @action(detail=True, methods=['post'])
+    def asociar_variante(self, request, pk=None):
+        """
+        Asocia esta imagen a una variante específica
+        POST /api/catalogo/imagen/{id}/asociar_variante/
+        Body: { "variante_id": 123 }
+        """
+        imagen = self.get_object()
+        variante_id = request.data.get('variante_id')
+        
+        if not variante_id:
+            return Response(
+                {'error': 'Se requiere el ID de la variante'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            variante = ProductoVariante.objects.get(
+                id=variante_id,
+                producto=imagen.producto
+            )
+            imagen.variante = variante
+            imagen.save()
+            
+            return Response({
+                'mensaje': 'Imagen asociada correctamente a la variante',
+                'imagen': ImagenProductoSerializer(imagen, context={'request': request}).data
+            })
+        except ProductoVariante.DoesNotExist:
+            return Response(
+                {'error': 'Variante no encontrada o no pertenece a este producto'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+    
+    @action(detail=True, methods=['post'])
+    def desasociar_variante(self, request, pk=None):
+        """
+        Desasocia esta imagen de su variante (la hace general del producto)
+        POST /api/catalogo/imagen/{id}/desasociar_variante/
+        """
+        imagen = self.get_object()
+        imagen.variante = None
+        imagen.save()
+        
+        return Response({
+            'mensaje': 'Imagen desasociada correctamente',
+            'imagen': ImagenProductoSerializer(imagen, context={'request': request}).data
+        })
