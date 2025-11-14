@@ -9,16 +9,21 @@ export default function Carrito() {
       const raw = localStorage.getItem("cart");
       const cart = raw ? JSON.parse(raw) : [];
       const base = Array.isArray(cart) ? cart : [];
+      
+      // ✅ CORREGIDO: No validar stock aquí, solo normalizar cantidad
       const normalized = base.map((it) => {
-        if (typeof it.stock === 'number') {
-          const max = Math.max(1, it.stock);
-          const qty = Math.min(Math.max(1, it.cantidad || 1), max);
-          return { ...it, cantidad: qty };
-        }
-        return it;
+        // Si no tiene cantidad, ponerle 1
+        const cantidad = Math.max(1, it.cantidad || 1);
+        return { ...it, cantidad };
       });
+      
       setItems(normalized);
-      try { localStorage.setItem("cart", JSON.stringify(normalized)); } catch { }
+      try { 
+        localStorage.setItem("cart", JSON.stringify(normalized)); 
+      } catch {
+        throw new Error("XX");
+        
+       }
     } catch {
       setItems([]);
     }
@@ -32,19 +37,27 @@ export default function Carrito() {
   const inc = (id) => {
     const next = items.map((it) => {
       if (it.id !== id) return it;
-      const stock = typeof it.stock === 'number' ? it.stock : Infinity;
+      
+      // ✅ CORREGIDO: Validar stock solo si existe
       const current = it.cantidad || 1;
-      const nueva = Math.min(current + 1, stock);
-      if (nueva === current && stock !== Infinity) {
+      const stockDisponible = typeof it.stock === 'number' ? it.stock : Infinity;
+      const nueva = Math.min(current + 1, stockDisponible);
+      
+      if (nueva === current && stockDisponible !== Infinity) {
         alert('Alcanzaste el stock disponible');
       }
+      
       return { ...it, cantidad: nueva };
     });
     persist(next);
   };
 
   const dec = (id) => {
-    const next = items.map((it) => (it.id === id ? { ...it, cantidad: Math.max(1, (it.cantidad || 1) - 1) } : it));
+    const next = items.map((it) => (
+      it.id === id 
+        ? { ...it, cantidad: Math.max(1, (it.cantidad || 1) - 1) } 
+        : it
+    ));
     persist(next);
   };
 
@@ -78,19 +91,38 @@ export default function Carrito() {
               items.map((item) => (
                 <tr key={item.id} className="border-b last:border-none">
                   <td className="py-4 flex items-center gap-4 min-w-[220px]">
-                    <img src={item.imagen || "https://via.placeholder.com/100"} alt={item.nombre} className="w-8 h-8 md:w-16 md:h-16 rounded-md object-cover" />
+                    <img 
+                      src={item.imagen || "https://via.placeholder.com/100"} 
+                      alt={item.nombre} 
+                      className="w-8 h-8 md:w-16 md:h-16 rounded-md object-cover" 
+                    />
                     <span className="font-medium break-words break-all md:break-normal">{item.nombre}</span>
                   </td>
                   <td>
                     <div className="flex items-center gap-2">
-                      <button onClick={() => dec(item.id)} className="border rounded-full w-6 h-6 flex justify-center items-center">-</button>
+                      <button 
+                        onClick={() => dec(item.id)} 
+                        className="border rounded-full w-6 h-6 flex justify-center items-center hover:bg-gray-100"
+                      >
+                        -
+                      </button>
                       <span>{item.cantidad || 1}</span>
-                      <button onClick={() => inc(item.id)} className="border rounded-full w-6 h-6 flex justify-center items-center">+</button>
+                      <button 
+                        onClick={() => inc(item.id)} 
+                        className="border rounded-full w-6 h-6 flex justify-center items-center hover:bg-gray-100"
+                      >
+                        +
+                      </button>
                     </div>
                   </td>
                   <td>${Number((item.precio || 0) * (item.cantidad || 1)).toLocaleString()}</td>
                   <td>
-                    <button onClick={() => removeItem(item.id)} className="text-red-500">Eliminar</button>
+                    <button 
+                      onClick={() => removeItem(item.id)} 
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      Eliminar
+                    </button>
                   </td>
                 </tr>
               ))
@@ -102,8 +134,15 @@ export default function Carrito() {
           <p className="text-lg font-semibold">Total: ${Number(total).toLocaleString()}</p>
           <a
             href={canCheckout ? "/enviopago" : "#"}
-            onClick={(e) => { if (!canCheckout) { e.preventDefault(); alert("Tu carrito está vacío"); } }}
-            className={`bg-[#084B83] text-white px-6 py-2 rounded-full transition ${canCheckout ? "hover:bg-gray-800" : "opacity-50 cursor-not-allowed"}`}
+            onClick={(e) => { 
+              if (!canCheckout) { 
+                e.preventDefault(); 
+                alert("Tu carrito está vacío"); 
+              } 
+            }}
+            className={`bg-[#084B83] text-white px-6 py-2 rounded-full transition ${
+              canCheckout ? "hover:bg-gray-800" : "opacity-50 cursor-not-allowed"
+            }`}
           >
             Checkout
           </a>

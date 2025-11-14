@@ -15,7 +15,8 @@ from pathlib import Path
 from decouple import config
 import mercadopago
 
-sdk = mercadopago.SDK(config('MERCADO_PAGO_ACCESS_TOKEN'))
+MERCADO_PAGO_ACCESS_TOKEN=config('MERCADO_PAGO_ACCESS_TOKEN')
+sdk = mercadopago.SDK(MERCADO_PAGO_ACCESS_TOKEN)
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent

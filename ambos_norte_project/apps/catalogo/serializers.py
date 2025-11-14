@@ -43,7 +43,7 @@ class ProductoVarianteSerializer(serializers.ModelSerializer):
     talla_nombre = serializers.CharField(source='talla.nombre', read_only=True)
     color_nombre = serializers.CharField(source='color.nombre', read_only=True)
     precio_final = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
-    imagenes = ImagenProductoSerializer(many=True, read_only=True)  # NUEVO: Imágenes de la variante
+    imagenes = ImagenProductoSerializer(many=True, read_only=True)
     
     class Meta:
         model = ProductoVariante
@@ -57,7 +57,7 @@ class ProductoVarianteSerializer(serializers.ModelSerializer):
             "precio_final",
             "activo",
             "fecha_creacion",
-            "imagenes"  # NUEVO
+            "imagenes"
         ]
         read_only_fields = ['precio_final', 'fecha_creacion']
 
@@ -66,9 +66,11 @@ class ProductoListSerializer(serializers.ModelSerializer):
     """Serializer para listar productos - vista resumida"""
     categoria_nombre = serializers.CharField(source='categoria.nombre', read_only=True)
     imagen_principal_url = serializers.SerializerMethodField()
-    stock_total = serializers.IntegerField(read_only=True)
-    stock_disponible = serializers.BooleanField(read_only=True)
+    stock_total = serializers.SerializerMethodField()  # ✨ CAMBIADO a SerializerMethodField
+    stock = serializers.SerializerMethodField()  # ✨ CAMBIADO a SerializerMethodField
+    stock_disponible = serializers.SerializerMethodField()  # ✨ CAMBIADO a SerializerMethodField
     variantes_count = serializers.SerializerMethodField()
+    precio = serializers.DecimalField(source='precio_base', max_digits=10, decimal_places=2, read_only=True)
 
     class Meta:
         model = Producto
@@ -76,7 +78,9 @@ class ProductoListSerializer(serializers.ModelSerializer):
             "id",
             "nombre",
             "precio_base",
+            "precio",
             "stock_total",
+            "stock",
             "stock_disponible",
             "activo",
             "destacado",
@@ -97,6 +101,18 @@ class ProductoListSerializer(serializers.ModelSerializer):
             pass
         return None
     
+    def get_stock_total(self, obj):
+        """Calcula el stock total de todas las variantes"""
+        return obj.stock_total()
+    
+    def get_stock(self, obj):
+        """Alias de stock_total para compatibilidad con frontend"""
+        return obj.stock_total()
+    
+    def get_stock_disponible(self, obj):
+        """Verifica si hay stock disponible"""
+        return obj.stock_disponible
+    
     def get_variantes_count(self, obj):
         return obj.variantes.filter(activo=True).count()
 
@@ -105,10 +121,12 @@ class ProductoDetailSerializer(serializers.ModelSerializer):
     """Serializer para detalle de producto - vista completa con variantes"""
     categoria_nombre = serializers.CharField(source='categoria.nombre', read_only=True)
     imagen_principal_url = serializers.SerializerMethodField()
-    imagenes = serializers.SerializerMethodField()  # MODIFICADO: Ahora filtramos imágenes generales
+    imagenes = serializers.SerializerMethodField()
     variantes = ProductoVarianteSerializer(many=True, read_only=True)
-    stock_total = serializers.IntegerField(read_only=True)
-    stock_disponible = serializers.BooleanField(read_only=True)
+    stock_total = serializers.SerializerMethodField()  # ✨ CAMBIADO
+    stock = serializers.SerializerMethodField()  # ✨ CAMBIADO
+    stock_disponible = serializers.SerializerMethodField()  # ✨ CAMBIADO
+    precio = serializers.DecimalField(source='precio_base', max_digits=10, decimal_places=2, read_only=True)
 
     class Meta:
         model = Producto
@@ -117,7 +135,9 @@ class ProductoDetailSerializer(serializers.ModelSerializer):
             "nombre",
             "descripcion",
             "precio_base",
+            "precio",
             "stock_total",
+            "stock",
             "stock_disponible",
             "material",
             "activo",
@@ -146,6 +166,18 @@ class ProductoDetailSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         imagenes_generales = obj.imagenes.filter(variante__isnull=True)
         return ImagenProductoSerializer(imagenes_generales, many=True, context={'request': request}).data
+    
+    def get_stock_total(self, obj):
+        """Calcula el stock total de todas las variantes"""
+        return obj.stock_total()
+    
+    def get_stock(self, obj):
+        """Alias de stock_total para compatibilidad con frontend"""
+        return obj.stock_total()
+    
+    def get_stock_disponible(self, obj):
+        """Verifica si hay stock disponible"""
+        return obj.stock_disponible
 
 
 class ProductoCreateUpdateSerializer(serializers.ModelSerializer):
@@ -176,39 +208,30 @@ class ProductoCreateUpdateSerializer(serializers.ModelSerializer):
     
     def to_internal_value(self, data):
         """Convertir valores de FormData correctamente"""
-        # Crear una copia mutable del data
         if hasattr(data, 'copy'):
             data = data.copy()
         else:
             data = dict(data)
         
-        # Convertir booleanos de strings
         if isinstance(data.get('activo'), str):
             data['activo'] = data.get('activo', 'true').lower() == 'true'
         
         if isinstance(data.get('destacado'), str):
             data['destacado'] = data.get('destacado', 'false').lower() == 'true'
         
-        # Guardar variantes para procesarlas después
         variantes_json = None
         if 'variantes' in data:
-            # Caso 1: Viene como string JSON (FormData con imagen)
             if isinstance(data['variantes'], str):
                 try:
                     variantes_json = json.loads(data['variantes'])
-                    print(f"🔄 Variantes parseadas del JSON string: {variantes_json}")
                 except json.JSONDecodeError as e:
                     print(f"❌ Error al parsear variantes: {e}")
-            # Caso 2: Viene como lista (JSON normal sin imagen)
             elif isinstance(data['variantes'], list):
                 variantes_json = data['variantes']
-                print(f"🔄 Variantes recibidas como lista: {variantes_json}")
         
-        # Remover variantes del data para que no cause error en el padre
         if 'variantes' in data:
             del data['variantes']
         
-        # Guardar en el contexto para usarlo en create/update
         if variantes_json:
             self._variantes_data = variantes_json
         
@@ -216,26 +239,13 @@ class ProductoCreateUpdateSerializer(serializers.ModelSerializer):
     
     def create(self, validated_data):
         """Crear producto con sus variantes"""
-        print(f"🔍 CREATE - Validated data: {validated_data}")
-        
-        # Obtener variantes del contexto
         variantes_data = getattr(self, '_variantes_data', [])
-        print(f"🔍 CREATE - Variantes data from context: {variantes_data}")
-        
         producto = Producto.objects.create(**validated_data)
-        print(f"✅ Producto creado: {producto.id}")
         
-        # Crear variantes si se proporcionaron
         for variante_data in variantes_data:
-            print(f"➕ Creando variante: {variante_data}")
-            
-            # Separar datos de imágenes si existen
             imagenes_data = variante_data.pop('imagenes', [])
-            
-            # Convertir IDs a instancias de modelo
             talla_id = variante_data.pop('talla')
             color_id = variante_data.pop('color')
-            
             talla = Talla.objects.get(id=talla_id)
             color = Color.objects.get(id=color_id)
             
@@ -245,52 +255,33 @@ class ProductoCreateUpdateSerializer(serializers.ModelSerializer):
                 color=color,
                 **variante_data
             )
-            print(f"✅ Variante creada: {variante.id}")
             
-            # Crear imágenes asociadas a la variante (si vienen en el JSON)
             for imagen_data in imagenes_data:
                 if isinstance(imagen_data, dict) and 'id' in imagen_data:
-                    # Si viene un ID, asociar imagen existente a la variante
                     try:
                         imagen = ImagenProducto.objects.get(id=imagen_data['id'], producto=producto)
                         imagen.variante = variante
                         imagen.save()
-                        print(f"✅ Imagen {imagen.id} asociada a variante {variante.id}")
                     except ImagenProducto.DoesNotExist:
-                        print(f"⚠️ Imagen {imagen_data['id']} no encontrada")
+                        pass
         
         return producto
 
     def update(self, instance, validated_data):
         """Actualizar producto y sus variantes"""
-        print(f"🔍 UPDATE - Validated data: {validated_data}")
-        
-        # Obtener variantes del contexto
         variantes_data = getattr(self, '_variantes_data', None)
-        print(f"🔍 UPDATE - Variantes data from context: {variantes_data}")
         
-        # Actualizar campos del producto
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
         
-        # Actualizar variantes si se proporcionaron
         if variantes_data is not None:
-            # Eliminar variantes existentes
             instance.variantes.all().delete()
-            print(f"🗑️ Variantes existentes eliminadas")
             
-            # Crear nuevas variantes
             for variante_data in variantes_data:
-                print(f"➕ Creando variante: {variante_data}")
-                
-                # Separar datos de imágenes si existen
                 imagenes_data = variante_data.pop('imagenes', [])
-                
-                # Convertir IDs a instancias de modelo
                 talla_id = variante_data.pop('talla')
                 color_id = variante_data.pop('color')
-                
                 talla = Talla.objects.get(id=talla_id)
                 color = Color.objects.get(id=color_id)
                 
@@ -300,18 +291,15 @@ class ProductoCreateUpdateSerializer(serializers.ModelSerializer):
                     color=color,
                     **variante_data
                 )
-                print(f"✅ Variante creada: {variante.id}")
                 
-                # Crear imágenes asociadas a la variante
                 for imagen_data in imagenes_data:
                     if isinstance(imagen_data, dict) and 'id' in imagen_data:
                         try:
                             imagen = ImagenProducto.objects.get(id=imagen_data['id'], producto=instance)
                             imagen.variante = variante
                             imagen.save()
-                            print(f"✅ Imagen {imagen.id} asociada a variante {variante.id}")
                         except ImagenProducto.DoesNotExist:
-                            print(f"⚠️ Imagen {imagen_data['id']} no encontrada")
+                            pass
         
         return instance
 
@@ -342,7 +330,6 @@ class ProductoVarianteCreateUpdateSerializer(serializers.ModelSerializer):
         talla = data.get('talla')
         color = data.get('color')
         
-        # En actualización, excluir la instancia actual
         queryset = ProductoVariante.objects.filter(
             producto=producto,
             talla=talla,
@@ -358,6 +345,6 @@ class ProductoVarianteCreateUpdateSerializer(serializers.ModelSerializer):
             )
         
         return data
-    
-#alias para carrito
+
+# Alias para compatibilidad
 ProductoSerializer = ProductoCreateUpdateSerializer

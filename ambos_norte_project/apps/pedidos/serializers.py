@@ -52,7 +52,7 @@ class PedidoSerializer(serializers.ModelSerializer):
     usuario_nombre = serializers.SerializerMethodField()
     direccion_info = serializers.SerializerMethodField()
     total_items = serializers.SerializerMethodField()
-    estado_pedido = serializers.CharField(source='estado', read_only=True)  # Alias para el frontend
+    estado_pedido = serializers.CharField(source='estado', read_only=True)
     costo_envio = serializers.SerializerMethodField()
 
     class Meta:
@@ -81,7 +81,6 @@ class PedidoSerializer(serializers.ModelSerializer):
         return obj.items.count()
     
     def get_costo_envio(self, obj):
-        # Calcular costo de envío como la diferencia entre total y subtotal
         return float(obj.total - obj.subtotal)
 
 
@@ -114,18 +113,29 @@ class CrearPedidoSerializer(serializers.Serializer):
         with transaction.atomic():
             detalles_items = [] 
             subtotal = Decimal('0.00')
+            
             for it in items_data:
                 try:
                     producto = Producto.objects.select_for_update().get(id=it['producto_id'])
                 except Producto.DoesNotExist:
-                    raise serializers.ValidationError({'items': [f"Producto con id {it['producto_id']} no existe"]})
+                    raise serializers.ValidationError({
+                        'items': [f"Producto con id {it['producto_id']} no existe"]
+                    })
+                
                 cantidad = int(it['cantidad'])
                 if cantidad <= 0:
-                    raise serializers.ValidationError({'items': [f"Cantidad inválida para producto {producto.id}"]})
-                if producto.stock < cantidad:
-                    raise serializers.ValidationError({'items': [f"Stock insuficiente para '{producto.nombre}'. Disponible: {producto.stock}"]})
+                    raise serializers.ValidationError({
+                        'items': [f"Cantidad inválida para producto {producto.id}"]
+                    })
+                
+                # ✅ CORREGIDO: Usar stock_total() en lugar de .stock
+                stock_disponible = producto.stock_total()
+                if stock_disponible < cantidad:
+                    raise serializers.ValidationError({
+                        'items': [f"Stock insuficiente para '{producto.nombre}'. Disponible: {stock_disponible}"]
+                    })
 
-                precio_unitario = Decimal(str(producto.precio))
+                precio_unitario = Decimal(str(producto.precio_base))
                 sub = Decimal(cantidad) * precio_unitario
                 detalles_items.append((producto, cantidad, precio_unitario, sub))
                 subtotal += sub
@@ -136,7 +146,6 @@ class CrearPedidoSerializer(serializers.Serializer):
             from datetime import datetime
             numero_pedido = datetime.utcnow().strftime('PN%Y%m%d%H%M%S')
 
-            # Estado por defecto será 'en_preparacion' según el modelo
             pedido = Pedido.objects.create(
                 numero_pedido=numero_pedido,
                 usuario=user,
@@ -145,7 +154,6 @@ class CrearPedidoSerializer(serializers.Serializer):
                 subtotal=subtotal,
                 total=total,
                 notas=notas,
-                # estado se asignará automáticamente como 'en_preparacion' por el default del modelo
             )
 
             # Crear items del pedido
@@ -158,8 +166,21 @@ class CrearPedidoSerializer(serializers.Serializer):
                     precio_unitario=precio_unitario,
                     subtotal=sub,
                 )
-                producto.stock = producto.stock - cantidad
-                producto.save(update_fields=['stock'])
+                
+                # ✅ CORREGIDO: Reducir stock de las variantes
+                # Como tienes variantes, necesitas decidir de cuál reducir
+                # Opción 1: Reducir de la primera variante con stock
+                variantes_disponibles = producto.variantes.filter(stock__gt=0, activo=True).order_by('-stock')
+                
+                cantidad_restante = cantidad
+                for variante in variantes_disponibles:
+                    if cantidad_restante <= 0:
+                        break
+                    
+                    cantidad_a_reducir = min(cantidad_restante, variante.stock)
+                    variante.stock -= cantidad_a_reducir
+                    variante.save(update_fields=['stock'])
+                    cantidad_restante -= cantidad_a_reducir
 
             # Crear registro inicial en el historial
             HistorialEstadoPedido.objects.create(
