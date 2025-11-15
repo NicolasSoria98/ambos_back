@@ -22,13 +22,16 @@ const paymentsService = {
       
       const response = await api.post('/pagos/pago/crear_preferencia/', data);
       
-      console.log('✅ Preferencia creada:', response.data);
-      return {
-        success: true,
-        data: response.data
-      };
+      console.log('✅ Respuesta del backend:', response.data);
+      
+      // El backend ya devuelve { success: true, data: {...} }
+      // NO necesitamos envolverlo de nuevo
+      return response.data;
+      
     } catch (error) {
       console.error('❌ Error al crear preferencia:', error);
+      
+      // En caso de error, mantener la misma estructura
       return {
         success: false,
         error: error.response?.data?.error || error.message || 'Error al crear preferencia de pago'
