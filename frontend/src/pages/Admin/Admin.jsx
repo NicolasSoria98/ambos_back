@@ -81,6 +81,35 @@ export default function AdminDashboard() {
         : 0;
 
       // ========== PEDIDOS ==========
+ const todosPedidosResponse = await ordersService.getAll();
+      const todosPedidos = todosPedidosResponse.results || todosPedidosResponse || [];
+
+      console.log('📦 Total de pedidos obtenidos:', todosPedidos.length);
+
+      // Filtrar pedidos de hoy
+      const pedidosHoy = todosPedidos.filter(pedido => {
+        if (!pedido.fecha_pedido) return false;
+        const fechaPedido = pedido.fecha_pedido.split('T')[0];
+        return fechaPedido === formatoFecha(hoy);
+      });
+
+      // Filtrar pedidos de ayer
+      const pedidosAyer = todosPedidos.filter(pedido => {
+        if (!pedido.fecha_pedido) return false;
+        const fechaPedido = pedido.fecha_pedido.split('T')[0];
+        return fechaPedido === formatoFecha(ayer);
+      });
+
+      const cantidadPedidosHoy = pedidosHoy.length;
+      const cantidadPedidosAyer = pedidosAyer.length;
+      const cambioPedidos = cantidadPedidosAyer > 0
+        ? ((cantidadPedidosHoy - cantidadPedidosAyer) / cantidadPedidosAyer) * 100
+        : 0;
+
+      console.log('📦 Pedidos de hoy:', cantidadPedidosHoy);
+      console.log('📦 Pedidos de ayer:', cantidadPedidosAyer);
+      console.log('📦 Cambio:', cambioPedidos.toFixed(2) + '%');
+      // Obtener resumen de métricas para usuarios
       const resumenData = await analyticsService.getResumenMetricas();
       
       // ========== TOP 5 PRODUCTOS MÁS VENDIDOS ==========
@@ -132,8 +161,8 @@ export default function AdminDashboard() {
           cambio: cambioVentas,
         },
         pedidos: {
-          hoy: cantidadPagosHoy,
-          cambio: cambioPagos,
+          hoy: cantidadPedidosHoy,
+          cambio: cambioPedidos,
         },
         usuarios: {
           hoy: resumenData.usuarios_activos_hoy || 0,
