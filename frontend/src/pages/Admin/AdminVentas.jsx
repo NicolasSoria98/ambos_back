@@ -40,14 +40,16 @@ export default function AdminVentas() {
   const [pagos, setPagos] = useState([]);
   const [pagosFiltrados, setPagosFiltrados] = useState([]);
   const [categoriasVendidas, setCategoriasVendidas] = useState([]);
-  
+
   // Estados de filtros
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('todos');
+
+  // Filtros de la tabla (movidos de arriba)
   const [filtroPedido, setFiltroPedido] = useState('');
   const [filtroCliente, setFiltroCliente] = useState('');
-  
+
   // KPIs
   const [kpis, setKpis] = useState({
     totalVentas: 0,
@@ -64,14 +66,20 @@ export default function AdminVentas() {
     const hoy = new Date();
     const hace30Dias = new Date();
     hace30Dias.setDate(hoy.getDate() - 30);
-    
+
     setFechaHasta(hoy.toISOString().split('T')[0]);
     setFechaDesde(hace30Dias.toISOString().split('T')[0]);
   }, []);
 
+  // Debounce para filtros de fecha - espera 1 segundo después del último cambio
   useEffect(() => {
-    if (fechaDesde && fechaHasta) {
-      loadVentasData();
+    // Validar que ambas fechas estén completas (formato YYYY-MM-DD tiene 10 caracteres)
+    if (fechaDesde && fechaHasta && fechaDesde.length === 10 && fechaHasta.length === 10) {
+      const timeoutId = setTimeout(() => {
+        loadVentasData();
+      }, 1000); // Espera 1 segundo después del último cambio
+
+      return () => clearTimeout(timeoutId);
     }
   }, [fechaDesde, fechaHasta]);
 
@@ -87,62 +95,64 @@ export default function AdminVentas() {
       // Obtener TODOS los pagos
       const pagosResponse = await paymentsService.getAll();
       const todosPagos = pagosResponse.results || pagosResponse || [];
-      
+
       console.log('💰 Total de pagos obtenidos:', todosPagos.length);
 
       // Enriquecer pagos con información del pedido y cliente
       const pagosEnriquecidos = await Promise.all(
         todosPagos.map(async (pago) => {
           try {
-            // Obtener información del pedido
+            let nombreCliente = 'Sin nombre';
+            let emailCliente = 'Sin email';
+
+            // Obtener información del pedido (que incluye datos del usuario)
             if (pago.pedido) {
               const pedidoId = typeof pago.pedido === 'number' ? pago.pedido : pago.pedido.id;
               const pedido = await ordersService.getById(pedidoId);
-              
-              // Obtener nombre del usuario del pedido
-              let nombreUsuario = 'Sin nombre';
-              let emailUsuario = 'Sin email';
 
-              // El pedido tiene usuario como ID o como objeto
-              if (pedido.usuario) {
-                if (typeof pedido.usuario === 'object') {
-                  nombreUsuario = pedido.usuario.nombre || pedido.usuario.first_name || pedido.usuario.username || 'Sin nombre';
-                  emailUsuario = pedido.usuario.email || 'Sin email';
-                } else {
-                  // Si viene como ID, usar los campos del pedido
-                  nombreUsuario = pedido.nombre_cliente || 'Sin nombre';
-                  emailUsuario = pedido.email_cliente || 'Sin email';
-                }
-              } else {
-                // Usar los campos directos del pedido
-                nombreUsuario = pedido.nombre_cliente || 'Sin nombre';
-                emailUsuario = pedido.email_cliente || 'Sin email';
-              }
-              
+              console.log(`📦 Pedido ${pedidoId}:`, pedido);
+
+              // El serializer del pedido ya trae 'usuario_nombre' calculado
+              nombreCliente = pedido.usuario_nombre || 'Cliente sin nombre';
+              emailCliente = pedido.email_contacto || 'Sin email';
+
+              console.log(`✅ Cliente del pedido #${pedidoId}: ${nombreCliente} (${emailCliente})`);
+
+              // Guardar objeto del pedido completo para usar en gráficos
               return {
                 ...pago,
                 pedido_obj: pedido,
-                cliente_nombre: nombreUsuario,
-                cliente_email: emailUsuario,
+                cliente_nombre: nombreCliente,
+                cliente_email: emailCliente,
               };
             }
-            return pago;
+
+            // Si no hay pedido asociado
+            return {
+              ...pago,
+              cliente_nombre: 'Sin pedido',
+              cliente_email: 'Sin pedido',
+            };
           } catch (error) {
-            console.error(`Error enriqueciendo pago ${pago.id}:`, error);
-            return pago;
+            console.error(`❌ Error obteniendo datos del pago ${pago.id}:`, error);
+            return {
+              ...pago,
+              cliente_nombre: 'Error al cargar',
+              cliente_email: 'Error al cargar',
+            };
           }
         })
       );
 
       console.log('✅ Pagos enriquecidos:', pagosEnriquecidos.length);
-      console.log('📦 Ejemplo de pago:', pagosEnriquecidos[0]);
+      console.log('📦 Muestra de pagos:', pagosEnriquecidos.slice(0, 3));
 
       setPagos(pagosEnriquecidos);
-      
+
       // Calcular ventas por día para el gráfico
       await calcularVentasPorDia(pagosEnriquecidos);
-      
-      // Calcular categorías vendidas
+
+      // Calcular categorías vendidas (filtradas por fecha)
       await calcularCategoriasVendidas(pagosEnriquecidos);
 
     } catch (error) {
@@ -204,10 +214,10 @@ export default function AdminVentas() {
 
   const calcularVentasPorDia = async (pagosData) => {
     const ventasPorFecha = {};
-    
+
     pagosData.forEach(pago => {
       const fechaPago = (pago.fecha_pago || pago.fecha_creacion || '').split('T')[0];
-      
+
       if (fechaPago >= fechaDesde && fechaPago <= fechaHasta) {
         if (!ventasPorFecha[fechaPago]) {
           ventasPorFecha[fechaPago] = 0;
@@ -222,7 +232,7 @@ export default function AdminVentas() {
     const dias = [];
     const inicio = new Date(fechaDesde);
     const fin = new Date(fechaHasta);
-    
+
     for (let d = new Date(inicio); d <= fin; d.setDate(d.getDate() + 1)) {
       const fechaStr = d.toISOString().split('T')[0];
       dias.push({
@@ -238,10 +248,15 @@ export default function AdminVentas() {
     const categoriasCantidad = {};
     const categoriasMontos = {};
 
-    // Solo pagos aprobados
-    const pagosAprobados = pagosData.filter(p => p.estado_pago === 'aprobado');
+    // Filtrar pagos por fecha ANTES de procesarlos
+    const pagosFiltradosPorFecha = pagosData.filter(pago => {
+      const fechaPago = (pago.fecha_pago || pago.fecha_creacion || '').split('T')[0];
+      return fechaPago >= fechaDesde && fechaPago <= fechaHasta && pago.estado_pago === 'aprobado';
+    });
 
-    for (const pago of pagosAprobados) {
+    console.log(`📊 Procesando ${pagosFiltradosPorFecha.length} pagos aprobados en el rango ${fechaDesde} - ${fechaHasta}`);
+
+    for (const pago of pagosFiltradosPorFecha) {
       try {
         if (pago.pedido_obj && pago.pedido_obj.items) {
           for (const item of pago.pedido_obj.items) {
@@ -250,8 +265,9 @@ export default function AdminVentas() {
             const montoTotal = cantidad * precioUnitario;
             let categoria = 'Sin categoría';
 
-            if (item.producto?.categoria_nombre) {
-              categoria = item.producto.categoria_nombre;
+            // Obtener categoría del producto
+            if (item.producto_info?.categoria_nombre) {
+              categoria = item.producto_info.categoria_nombre;
             } else if (item.producto) {
               const productoId = typeof item.producto === 'number' ? item.producto : item.producto.id;
               try {
@@ -266,7 +282,7 @@ export default function AdminVentas() {
               categoriasCantidad[categoria] = 0;
               categoriasMontos[categoria] = 0;
             }
-            
+
             categoriasCantidad[categoria] += cantidad;
             categoriasMontos[categoria] += montoTotal;
           }
@@ -276,16 +292,16 @@ export default function AdminVentas() {
       }
     }
 
-    // Convertir a array TODAS las categorías (no solo top 5)
+    // Convertir a array TODAS las categorías
     const categoriasArray = Object.entries(categoriasCantidad)
       .map(([nombre, cantidad]) => ({
         nombre,
         cantidad,
         monto: categoriasMontos[nombre]
       }))
-      .sort((a, b) => b.monto - a.monto); // Ordenar por monto
+      .sort((a, b) => b.monto - a.monto);
 
-    console.log('📊 Todas las categorías vendidas:', categoriasArray);
+    console.log('📊 Categorías vendidas en el período:', categoriasArray);
     setCategoriasVendidas(categoriasArray);
   };
 
@@ -304,6 +320,20 @@ export default function AdminVentas() {
     };
     return textos[estado] || estado;
   };
+
+  // Array de colores para las categorías
+  const coloresCategoria = [
+    'rgba(99, 102, 241, 0.8)',   // Indigo
+    'rgba(34, 197, 94, 0.8)',    // Green
+    'rgba(234, 179, 8, 0.8)',    // Yellow
+    'rgba(168, 85, 247, 0.8)',   // Purple
+    'rgba(239, 68, 68, 0.8)',    // Red
+    'rgba(59, 130, 246, 0.8)',   // Blue
+    'rgba(249, 115, 22, 0.8)',   // Orange
+    'rgba(236, 72, 153, 0.8)',   // Pink
+    'rgba(20, 184, 166, 0.8)',   // Teal
+    'rgba(161, 98, 7, 0.8)',     // Brown
+  ];
 
   // Datos del gráfico de líneas (ventas por día)
   const ventasChartData = {
@@ -343,27 +373,19 @@ export default function AdminVentas() {
     },
   };
 
-  // Datos del gráfico de categorías (Doughnut - todas las categorías)
+  // Calcular total para porcentajes
+  const totalVentasCategorias = categoriasVendidas.reduce((sum, c) => sum + c.monto, 0);
+
+  // Datos del gráfico de categorías (Doughnut - CON PORCENTAJES)
   const categoriasChartData = {
     labels: categoriasVendidas.map(c => c.nombre),
     datasets: [
       {
-        data: categoriasVendidas.map(c => c.monto),
-        backgroundColor: categoriasVendidas.map((_, index) => {
-          const colores = [
-            'rgba(99, 102, 241, 0.8)',
-            'rgba(34, 197, 94, 0.8)',
-            'rgba(234, 179, 8, 0.8)',
-            'rgba(168, 85, 247, 0.8)',
-            'rgba(239, 68, 68, 0.8)',
-            'rgba(59, 130, 246, 0.8)',
-            'rgba(249, 115, 22, 0.8)',
-            'rgba(236, 72, 153, 0.8)',
-            'rgba(20, 184, 166, 0.8)',
-            'rgba(161, 98, 7, 0.8)',
-          ];
-          return colores[index % colores.length];
+        data: categoriasVendidas.map(c => {
+          // Calcular porcentaje basado en el total
+          return totalVentasCategorias > 0 ? ((c.monto / totalVentasCategorias) * 100) : 0;
         }),
+        backgroundColor: categoriasVendidas.map((_, index) => coloresCategoria[index % coloresCategoria.length]),
         borderWidth: 0,
       },
     ],
@@ -378,22 +400,32 @@ export default function AdminVentas() {
         callbacks: {
           label: (context) => {
             const cat = categoriasVendidas[context.dataIndex];
-            return [`${cat.nombre}`, `$${cat.monto.toLocaleString()}`, `${cat.cantidad} unidades`];
+            const porcentaje = totalVentasCategorias > 0 ? ((cat.monto / totalVentasCategorias) * 100).toFixed(1) : 0;
+            return [
+              `${cat.nombre}`,
+              `${porcentaje}%`,
+              `$${cat.monto.toLocaleString()}`,
+              `${cat.cantidad} unidades`
+            ];
           },
         },
       },
     },
   };
 
-  // Datos del gráfico de barras de categorías
+  // Datos del gráfico de barras de categorías (CON COLORES DIFERENTES)
   const categoriasBarrasChartData = {
     labels: categoriasVendidas.map(c => c.nombre),
     datasets: [
       {
         label: 'Ventas por Categoría ($)',
         data: categoriasVendidas.map(c => c.monto),
-        backgroundColor: 'rgba(99, 102, 241, 0.8)',
-        borderColor: 'rgba(99, 102, 241, 1)',
+        backgroundColor: categoriasVendidas.map((_, index) => coloresCategoria[index % coloresCategoria.length]),
+        borderColor: categoriasVendidas.map((_, index) => {
+          // Versión más oscura del color para el borde
+          const color = coloresCategoria[index % coloresCategoria.length];
+          return color.replace('0.8)', '1)');
+        }),
         borderWidth: 1,
       },
     ],
@@ -403,7 +435,7 @@ export default function AdminVentas() {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: { display: true, position: 'top' },
+      legend: { display: false },
       tooltip: {
         callbacks: {
           label: (context) => {
@@ -425,7 +457,7 @@ export default function AdminVentas() {
     const hoy = new Date();
     const hace30Dias = new Date();
     hace30Dias.setDate(hoy.getDate() - 30);
-    
+
     setFechaHasta(hoy.toISOString().split('T')[0]);
     setFechaDesde(hace30Dias.toISOString().split('T')[0]);
     setFiltroEstado('todos');
@@ -437,7 +469,7 @@ export default function AdminVentas() {
     const hoy = new Date();
     const inicio = new Date();
     inicio.setDate(hoy.getDate() - dias);
-    
+
     setFechaHasta(hoy.toISOString().split('T')[0]);
     setFechaDesde(inicio.toISOString().split('T')[0]);
   };
@@ -469,7 +501,7 @@ export default function AdminVentas() {
           </p>
         </div>
 
-        {/* Filtros Avanzados */}
+        {/* Filtros Avanzados (solo fechas y estado) */}
         <div className="bg-white shadow-lg rounded-lg p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900">
@@ -507,7 +539,7 @@ export default function AdminVentas() {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* Fecha Desde */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -551,36 +583,6 @@ export default function AdminVentas() {
                 <option value="aprobado">Aprobado</option>
                 <option value="pendiente">Pendiente</option>
               </select>
-            </div>
-
-            {/* Pedido */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <i className="fas fa-shopping-bag mr-2"></i>
-                Pedido ID
-              </label>
-              <input
-                type="text"
-                placeholder="Buscar por ID..."
-                value={filtroPedido}
-                onChange={(e) => setFiltroPedido(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              />
-            </div>
-
-            {/* Cliente */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <i className="fas fa-user mr-2"></i>
-                Cliente
-              </label>
-              <input
-                type="text"
-                placeholder="Nombre o email..."
-                value={filtroCliente}
-                onChange={(e) => setFiltroCliente(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              />
             </div>
           </div>
 
@@ -628,10 +630,19 @@ export default function AdminVentas() {
             </div>
           </ChartCard>
 
-          {/* Gráfico de Categorías Vendidas */}
-          <ChartCard title="Distribución de Ventas por Categoría" icon="fas fa-chart-pie">
+          {/* Gráfico de Categorías Vendidas (PORCENTAJES) */}
+          <ChartCard title="Distribución de Ventas por Categoría (%)" icon="fas fa-chart-pie">
             <div className="relative" style={{ height: '300px' }}>
-              <Doughnut data={categoriasChartData} options={categoriasChartOptions} />
+              {categoriasVendidas.length > 0 ? (
+                <Doughnut data={categoriasChartData} options={categoriasChartOptions} />
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-500">
+                  <div className="text-center">
+                    <i className="fas fa-chart-pie text-4xl mb-2 opacity-50"></i>
+                    <p className="text-sm">No hay datos para mostrar en el período seleccionado</p>
+                  </div>
+                </div>
+              )}
             </div>
           </ChartCard>
         </div>
@@ -640,20 +651,62 @@ export default function AdminVentas() {
         <div className="mb-8">
           <ChartCard title="Ventas por Categoría" icon="fas fa-chart-bar">
             <div className="relative" style={{ height: '350px' }}>
-              <Bar data={categoriasBarrasChartData} options={categoriasBarrasChartOptions} />
+              {categoriasVendidas.length > 0 ? (
+                <Bar data={categoriasBarrasChartData} options={categoriasBarrasChartOptions} />
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-500">
+                  <div className="text-center">
+                    <i className="fas fa-chart-bar text-4xl mb-2 opacity-50"></i>
+                    <p className="text-sm">No hay datos para mostrar en el período seleccionado</p>
+                  </div>
+                </div>
+              )}
             </div>
           </ChartCard>
         </div>
 
-        {/* Tabla de Pagos */}
+        {/* Tabla de Pagos con filtros integrados */}
         <div className="bg-white shadow-lg rounded-lg overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
               <i className="fas fa-table mr-2 text-indigo-600"></i>
               Detalle de Pagos
             </h3>
+
+            {/* Filtros de la tabla */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Pedido */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <i className="fas fa-shopping-bag mr-2"></i>
+                  Buscar por Pedido ID
+                </label>
+                <input
+                  type="text"
+                  placeholder="Buscar por ID de pedido..."
+                  value={filtroPedido}
+                  onChange={(e) => setFiltroPedido(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </div>
+
+              {/* Cliente */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <i className="fas fa-user mr-2"></i>
+                  Buscar por Cliente
+                </label>
+                <input
+                  type="text"
+                  placeholder="Buscar por nombre o email..."
+                  value={filtroCliente}
+                  onChange={(e) => setFiltroCliente(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </div>
+            </div>
           </div>
-          
+
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">

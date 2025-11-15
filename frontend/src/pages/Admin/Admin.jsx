@@ -19,7 +19,6 @@ import analyticsService from '../../services/analytics';
 import productsService from '../../services/products';
 import ordersService from '../../services/orders';
 
-
 // Registrar componentes de Chart.js
 ChartJS.register(
   CategoryScale,
@@ -47,25 +46,33 @@ export default function AdminDashboard() {
     loadDashboardData();
   }, []);
 
+  // Función para formatear fecha en formato local YYYY-MM-DD
+  const formatoFechaLocal = (fecha) => {
+    const year = fecha.getFullYear();
+    const month = String(fecha.getMonth() + 1).padStart(2, '0');
+    const day = String(fecha.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const loadDashboardData = async () => {
     try {
       setLoading(true);
 
-      // Fecha de hoy y ayer
+      // Fecha de hoy y ayer (usando hora local)
       const hoy = new Date();
-      const ayer = new Date();
+      hoy.setHours(0, 0, 0, 0); // Resetear hora para comparaciones
+      
+      const ayer = new Date(hoy);
       ayer.setDate(hoy.getDate() - 1);
-
-      const formatoFecha = (fecha) => fecha.toISOString().split('T')[0];
 
       // ========== VENTAS POR PAGOS APROBADOS ==========
       const ventasHoyData = await analyticsService.getVentasPorPagosAprobados(
-        formatoFecha(hoy),
-        formatoFecha(hoy)
+        formatoFechaLocal(hoy),
+        formatoFechaLocal(hoy)
       );
       const ventasAyerData = await analyticsService.getVentasPorPagosAprobados(
-        formatoFecha(ayer),
-        formatoFecha(ayer)
+        formatoFechaLocal(ayer),
+        formatoFechaLocal(ayer)
       );
 
       const ventasHoy = ventasHoyData.total || 0;
@@ -81,7 +88,7 @@ export default function AdminDashboard() {
         : 0;
 
       // ========== PEDIDOS ==========
- const todosPedidosResponse = await ordersService.getAll();
+      const todosPedidosResponse = await ordersService.getAll();
       const todosPedidos = todosPedidosResponse.results || todosPedidosResponse || [];
 
       console.log('📦 Total de pedidos obtenidos:', todosPedidos.length);
@@ -90,14 +97,14 @@ export default function AdminDashboard() {
       const pedidosHoy = todosPedidos.filter(pedido => {
         if (!pedido.fecha_pedido) return false;
         const fechaPedido = pedido.fecha_pedido.split('T')[0];
-        return fechaPedido === formatoFecha(hoy);
+        return fechaPedido === formatoFechaLocal(hoy);
       });
 
       // Filtrar pedidos de ayer
       const pedidosAyer = todosPedidos.filter(pedido => {
         if (!pedido.fecha_pedido) return false;
         const fechaPedido = pedido.fecha_pedido.split('T')[0];
-        return fechaPedido === formatoFecha(ayer);
+        return fechaPedido === formatoFechaLocal(ayer);
       });
 
       const cantidadPedidosHoy = pedidosHoy.length;
@@ -109,6 +116,7 @@ export default function AdminDashboard() {
       console.log('📦 Pedidos de hoy:', cantidadPedidosHoy);
       console.log('📦 Pedidos de ayer:', cantidadPedidosAyer);
       console.log('📦 Cambio:', cambioPedidos.toFixed(2) + '%');
+      
       // Obtener resumen de métricas para usuarios
       const resumenData = await analyticsService.getResumenMetricas();
       
@@ -121,29 +129,35 @@ export default function AdminDashboard() {
       setVariantesStockBajo(variantesStockBajoData);
 
       // ========== VENTAS ÚLTIMOS 30 DÍAS (POR PAGOS APROBADOS) ==========
-      const hace30Dias = new Date();
-      hace30Dias.setDate(hoy.getDate() - 30);
+      const hace30Dias = new Date(hoy);
+      hace30Dias.setDate(hoy.getDate() - 29); // 29 días atrás + hoy = 30 días
+
+      console.log('📅 Rango de fechas para ventas:');
+      console.log('  Desde:', formatoFechaLocal(hace30Dias));
+      console.log('  Hasta:', formatoFechaLocal(hoy));
 
       // Obtener TODOS los pagos aprobados del mes de una sola vez
       const todosPagosDelMes = await analyticsService.getVentasPorPagosAprobados(
-        formatoFecha(hace30Dias),
-        formatoFecha(hoy)
+        formatoFechaLocal(hace30Dias),
+        formatoFechaLocal(hoy)
       );
 
-      // ========== TICKET PROMEDIO DEL MES (reutilizamos todosPagosDelMes) ==========
+      console.log('💰 Pagos del mes obtenidos:', todosPagosDelMes.pagos?.length || 0);
+
+      // ========== TICKET PROMEDIO DEL MES ==========
       const ticketPromedioMes = todosPagosDelMes.cantidad_pagos > 0 
         ? todosPagosDelMes.total / todosPagosDelMes.cantidad_pagos 
         : 0;
       
       // Para el cambio, calcular ticket promedio del mes anterior
-      const hace60Dias = new Date();
+      const hace60Dias = new Date(hoy);
       hace60Dias.setDate(hoy.getDate() - 60);
-      const hace31Dias = new Date();
-      hace31Dias.setDate(hoy.getDate() - 31);
+      const hace31Dias = new Date(hoy);
+      hace31Dias.setDate(hoy.getDate() - 30);
       
       const ventasMesAnteriorData = await analyticsService.getVentasPorPagosAprobados(
-        formatoFecha(hace60Dias),
-        formatoFecha(hace31Dias)
+        formatoFechaLocal(hace60Dias),
+        formatoFechaLocal(hace31Dias)
       );
       
       const ticketPromedioMesAnterior = ventasMesAnteriorData.cantidad_pagos > 0 
@@ -174,82 +188,97 @@ export default function AdminDashboard() {
         },
       });
 
-      // Agrupar pagos por fecha
+      // Agrupar pagos por fecha (USANDO FECHA LOCAL)
       const ventasPorFecha = {};
-      todosPagosDelMes.pagos.forEach(pago => {
-        const fechaPago = (pago.fecha_pago || pago.fecha_creacion).split('T')[0];
-        if (!ventasPorFecha[fechaPago]) {
-          ventasPorFecha[fechaPago] = 0;
-        }
-        ventasPorFecha[fechaPago] += parseFloat(pago.monto || 0);
-      });
+      
+      if (todosPagosDelMes.pagos && Array.isArray(todosPagosDelMes.pagos)) {
+        todosPagosDelMes.pagos.forEach(pago => {
+          // Extraer solo la fecha (YYYY-MM-DD) sin conversión de zona horaria
+          const fechaPago = (pago.fecha_pago || pago.fecha_creacion).split('T')[0];
+          
+          console.log(`💳 Pago #${pago.id}: Fecha=${fechaPago}, Monto=${pago.monto}`);
+          
+          if (!ventasPorFecha[fechaPago]) {
+            ventasPorFecha[fechaPago] = 0;
+          }
+          ventasPorFecha[fechaPago] += parseFloat(pago.monto || 0);
+        });
+      }
 
-      // Crear array con todos los días (incluso si no hay ventas)
+      console.log('📊 Ventas agrupadas por fecha:', ventasPorFecha);
+
+      // Crear array con todos los días (últimos 30 días incluyendo HOY)
       const ventasPorDia = [];
-      for (let i = 30; i >= 0; i--) {
-        const fecha = new Date();
+      for (let i = 29; i >= 0; i--) {
+        const fecha = new Date(hoy);
         fecha.setDate(hoy.getDate() - i);
-        const fechaStr = formatoFecha(fecha);
+        const fechaStr = formatoFechaLocal(fecha);
         
         ventasPorDia.push({
           fecha: fechaStr,
           total: ventasPorFecha[fechaStr] || 0
         });
       }
+
+      console.log('📈 Datos para el gráfico:', ventasPorDia);
+      console.log('📅 Primera fecha:', ventasPorDia[0]?.fecha);
+      console.log('📅 Última fecha:', ventasPorDia[ventasPorDia.length - 1]?.fecha);
+      
       setVentasPorPagos(ventasPorDia);
 
-// Obtener pedidos de los últimos 30 días a partir de los pagos aprobados
-const categoriasCantidad = {};
+      // ========== CATEGORÍAS VENDIDAS ==========
+      const categoriasCantidad = {};
       let totalUnidadesVendidas = 0;
 
-      console.log('🔍 Procesando pagos para categorías:', todosPagosDelMes.pagos.length);
+      console.log('🔍 Procesando pagos para categorías:', todosPagosDelMes.pagos?.length || 0);
 
       // Procesar cada pago aprobado
-      for (const pago of todosPagosDelMes.pagos) {
-        try {
-          // Obtener el pedido asociado al pago
-          const pedidoId = pago.pedido;
-          if (!pedidoId) continue;
+      if (todosPagosDelMes.pagos && Array.isArray(todosPagosDelMes.pagos)) {
+        for (const pago of todosPagosDelMes.pagos) {
+          try {
+            // Obtener el pedido asociado al pago
+            const pedidoId = pago.pedido;
+            if (!pedidoId) continue;
 
-          const pedido = await ordersService.getById(pedidoId);
-          
-          // Procesar los items del pedido
-          if (pedido.items && Array.isArray(pedido.items)) {
-            for (const item of pedido.items) {
-              const cantidad = parseInt(item.cantidad) || 0;
-              let categoria = 'Sin categoría';
+            const pedido = await ordersService.getById(pedidoId);
+            
+            // Procesar los items del pedido
+            if (pedido.items && Array.isArray(pedido.items)) {
+              for (const item of pedido.items) {
+                const cantidad = parseInt(item.cantidad) || 0;
+                let categoria = 'Sin categoría';
 
-              // Intentar obtener categoría del item
-              if (item.producto?.categoria_nombre) {
-                categoria = item.producto.categoria_nombre;
-              } else if (item.categoria_nombre) {
-                categoria = item.categoria_nombre;
-              } else if (item.producto) {
-                // Si el producto viene como objeto pero sin categoria_nombre expandido
-                // Obtener el producto completo
-                try {
-                  const productoId = typeof item.producto === 'number' ? item.producto : item.producto.id;
-                  if (productoId) {
-                    const productoCompleto = await productsService.getById(productoId);
-                    categoria = productoCompleto.categoria_nombre || 'Sin categoría';
+                // Intentar obtener categoría del item
+                if (item.producto_info?.categoria_nombre) {
+                  categoria = item.producto_info.categoria_nombre;
+                } else if (item.producto?.categoria_nombre) {
+                  categoria = item.producto.categoria_nombre;
+                } else if (item.categoria_nombre) {
+                  categoria = item.categoria_nombre;
+                } else if (item.producto) {
+                  // Obtener el producto completo
+                  try {
+                    const productoId = typeof item.producto === 'number' ? item.producto : item.producto.id;
+                    if (productoId) {
+                      const productoCompleto = await productsService.getById(productoId);
+                      categoria = productoCompleto.categoria_nombre || 'Sin categoría';
+                    }
+                  } catch (error) {
+                    console.error(`Error obteniendo producto ${item.producto}:`, error);
                   }
-                } catch (error) {
-                  console.error(`Error obteniendo producto ${item.producto}:`, error);
                 }
-              }
 
-              console.log(`📦 Item procesado: ${item.nombre_producto || 'Sin nombre'} - Categoría: ${categoria} - Cantidad: ${cantidad}`);
-
-              if (!categoriasCantidad[categoria]) {
-                categoriasCantidad[categoria] = 0;
+                if (!categoriasCantidad[categoria]) {
+                  categoriasCantidad[categoria] = 0;
+                }
+                
+                categoriasCantidad[categoria] += cantidad;
+                totalUnidadesVendidas += cantidad;
               }
-              
-              categoriasCantidad[categoria] += cantidad;
-              totalUnidadesVendidas += cantidad;
             }
+          } catch (error) {
+            console.error(`❌ Error procesando pedido del pago ${pago.id}:`, error);
           }
-        } catch (error) {
-          console.error(`❌ Error procesando pedido del pago ${pago.id}:`, error);
         }
       }
 
@@ -270,6 +299,7 @@ const categoriasCantidad = {};
 
       console.log('✅ Categorías vendidas (últimos 30 días):', categoriasConPorcentaje);
       setCategoriasVendidas(categoriasConPorcentaje);
+      
       // ========== PRODUCTOS INACTIVOS ==========
       const todosLosProductos = await productsService.getAll();
       const productos = todosLosProductos.results || todosLosProductos || [];
@@ -286,7 +316,7 @@ const categoriasCantidad = {};
   // Preparar datos para el gráfico de líneas (ventas por pagos aprobados)
   const ventasChartData = {
     labels: ventasPorPagos.map((v) => {
-      const fecha = new Date(v.fecha);
+      const fecha = new Date(v.fecha + 'T00:00:00'); // Agregar hora para evitar problemas de zona horaria
       return `${fecha.getDate()}/${fecha.getMonth() + 1}`;
     }),
     datasets: [
@@ -346,7 +376,7 @@ const categoriasCantidad = {};
     ],
   };
 
-const categoriasChartOptions = {
+  const categoriasChartOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
