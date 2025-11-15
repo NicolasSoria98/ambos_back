@@ -72,6 +72,104 @@ const analyticsService = {
     return response.data;
   },
 
+  // ==================== NUEVOS MÉTODOS PARA DASHBOARD ====================
+
+  /**
+   * Obtener ventas basadas en pagos con estado "aprobado"
+   * Calcula las ventas sumando los montos de pagos aprobados
+   * Filtra por fecha de pago (fecha_pago) o fecha de creación si no existe
+   */
+  getVentasPorPagosAprobados: async (fechaDesde, fechaHasta) => {
+    try {
+      // Obtener TODOS los pagos aprobados (sin filtro de fecha en la API)
+      const response = await api.get('/pagos/pago/', {
+        params: {
+          estado_pago: 'aprobado'
+        }
+      });
+
+      const todosPagos = response.data.results || response.data || [];
+      
+      // Filtrar manualmente por fecha en el frontend
+      const pagosFiltrados = todosPagos.filter(pago => {
+        // Usar fecha_pago si existe, sino fecha_creacion
+        const fechaPago = pago.fecha_pago || pago.fecha_creacion;
+        if (!fechaPago) return false;
+
+        // Extraer solo la fecha (YYYY-MM-DD) sin la hora
+        const fechaPagoStr = fechaPago.split('T')[0];
+        
+        // Comparar fechas
+        return fechaPagoStr >= fechaDesde && fechaPagoStr <= fechaHasta;
+      });
+
+      // Calcular total de ventas
+      const totalVentas = pagosFiltrados.reduce((sum, pago) => {
+        return sum + parseFloat(pago.monto || 0);
+      }, 0);
+
+      return {
+        total: totalVentas,
+        cantidad_pagos: pagosFiltrados.length,
+        pagos: pagosFiltrados
+      };
+    } catch (error) {
+      console.error('Error obteniendo ventas por pagos aprobados:', error);
+      return { total: 0, cantidad_pagos: 0, pagos: [] };
+    }
+  },
+
+  /**
+   * Obtener los 5 productos más vendidos basados en items de pedidos
+   */
+  getTopProductosVendidos: async (limite = 5) => {
+    try {
+      // Obtener todos los pedidos
+      const pedidosResponse = await api.get('/pedidos/pedido/');
+      const pedidos = pedidosResponse.data.results || pedidosResponse.data || [];
+
+      // Crear un mapa para contar productos vendidos
+      const productosVendidos = {};
+
+      // Recorrer todos los pedidos y sus items
+      pedidos.forEach(pedido => {
+        if (pedido.items && Array.isArray(pedido.items)) {
+          pedido.items.forEach(item => {
+            const productoId = item.producto?.id || item.producto;
+            const productoNombre = item.producto?.nombre || item.nombre_producto;
+            const cantidad = parseInt(item.cantidad) || 0;
+            const precioUnitario = parseFloat(item.precio_unitario) || 0;
+
+            if (productoId) {
+              if (!productosVendidos[productoId]) {
+                productosVendidos[productoId] = {
+                  producto_id: productoId,
+                  producto_nombre: productoNombre,
+                  ventas: 0,
+                  ingresos: 0,
+                  producto: item.producto
+                };
+              }
+
+              productosVendidos[productoId].ventas += cantidad;
+              productosVendidos[productoId].ingresos += (cantidad * precioUnitario);
+            }
+          });
+        }
+      });
+
+      // Convertir a array y ordenar por cantidad de ventas
+      const productosArray = Object.values(productosVendidos)
+        .sort((a, b) => b.ventas - a.ventas)
+        .slice(0, limite);
+
+      return productosArray;
+    } catch (error) {
+      console.error('Error obteniendo top productos vendidos:', error);
+      return [];
+    }
+  },
+
   // ==================== REPORTES ====================
   
   // Embudo de conversión

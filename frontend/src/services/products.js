@@ -74,6 +74,76 @@ const productsService = {
     return response.data;
   },
 
+  /**
+   * NUEVO: Obtener variantes con stock bajo
+   * Retorna todas las variantes que tengan stock <= umbral
+   * @param {number} umbral - Stock máximo para considerar bajo (default: 10)
+   * @returns {Array} Array de variantes con stock bajo
+   */
+  getVariantesStockBajo: async (umbral = 10) => {
+    try {
+      // Obtener todas las variantes activas
+      const response = await api.get('/catalogo/variante/');
+      let variantes = response.data.results || response.data || [];
+
+      console.log('📦 Total variantes obtenidas:', variantes.length);
+      console.log('📦 Ejemplo de variante:', variantes[0]);
+
+      // Filtrar variantes con stock <= umbral y activas
+      const variantesStockBajo = variantes.filter(variante => {
+        return variante.stock <= umbral && variante.activo;
+      });
+
+      console.log('⚠️ Variantes con stock bajo:', variantesStockBajo.length);
+
+      // Enriquecer con información del producto, talla y color si no viene completa
+      const variantesEnriquecidas = await Promise.all(
+        variantesStockBajo.map(async (variante) => {
+          try {
+            // Enriquecer producto si viene como ID
+            if (!variante.producto || typeof variante.producto === 'number') {
+              const productoId = variante.producto;
+              const productoResponse = await api.get(`/catalogo/producto/${productoId}/`);
+              variante.producto = productoResponse.data;
+            }
+
+            // Enriquecer talla si viene como ID
+            if (typeof variante.talla === 'number' && !variante.talla_nombre) {
+              const tallaResponse = await api.get(`/catalogo/talla/${variante.talla}/`);
+              variante.talla_nombre = tallaResponse.data.nombre;
+              variante.talla_obj = tallaResponse.data;
+            }
+
+            // Enriquecer color si viene como ID
+            if (typeof variante.color === 'number' && !variante.color_nombre) {
+              const colorResponse = await api.get(`/catalogo/color/${variante.color}/`);
+              variante.color_nombre = colorResponse.data.nombre;
+              variante.color_obj = colorResponse.data;
+            }
+
+            console.log('✅ Variante enriquecida:', {
+              id: variante.id,
+              producto: variante.producto?.nombre,
+              talla: variante.talla_nombre,
+              color: variante.color_nombre,
+              stock: variante.stock
+            });
+
+            return variante;
+          } catch (error) {
+            console.error(`❌ Error enriqueciendo variante ${variante.id}:`, error);
+            return variante;
+          }
+        })
+      );
+
+      return variantesEnriquecidas;
+    } catch (error) {
+      console.error('❌ Error obteniendo variantes con stock bajo:', error);
+      return [];
+    }
+  },
+
   // ============ CATEGORÍAS ============
   
   getCategories: async () => {
@@ -252,3 +322,4 @@ const productsService = {
 };
 
 export default productsService;
+
