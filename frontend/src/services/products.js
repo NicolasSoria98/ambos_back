@@ -143,6 +143,62 @@ const productsService = {
       return [];
     }
   },
+  getAllVariantesEnriquecidas: async () => {
+    try {
+      // Obtener todas las variantes
+      const response = await api.get('/catalogo/variante/');
+      let variantes = response.data.results || response.data || [];
+
+      console.log('📦 Total variantes obtenidas:', variantes.length);
+
+      // Enriquecer con información del producto, talla y color
+      const variantesEnriquecidas = await Promise.all(
+        variantes.map(async (variante) => {
+          try {
+            // Enriquecer producto si viene como ID
+            if (!variante.producto || typeof variante.producto === 'number') {
+              const productoId = variante.producto;
+              const productoResponse = await api.get(`/catalogo/producto/${productoId}/`);
+              variante.producto = productoResponse.data;
+            }
+
+            // Enriquecer talla si viene como ID
+            if (typeof variante.talla === 'number' && !variante.talla_nombre) {
+              const tallaResponse = await api.get(`/catalogo/talla/${variante.talla}/`);
+              variante.talla_nombre = tallaResponse.data.nombre;
+              variante.talla_obj = tallaResponse.data;
+            } else if (variante.talla && variante.talla.nombre) {
+              // Si ya viene como objeto
+              variante.talla_nombre = variante.talla.nombre;
+              variante.talla_obj = variante.talla;
+            }
+
+            // Enriquecer color si viene como ID
+            if (typeof variante.color === 'number' && !variante.color_nombre) {
+              const colorResponse = await api.get(`/catalogo/color/${variante.color}/`);
+              variante.color_nombre = colorResponse.data.nombre;
+              variante.color_obj = colorResponse.data;
+            } else if (variante.color && variante.color.nombre) {
+              // Si ya viene como objeto
+              variante.color_nombre = variante.color.nombre;
+              variante.color_obj = variante.color;
+            }
+
+            return variante;
+          } catch (error) {
+            console.error(`❌ Error enriqueciendo variante ${variante.id}:`, error);
+            return variante;
+          }
+        })
+      );
+
+      console.log('✅ Variantes enriquecidas:', variantesEnriquecidas.length);
+      return variantesEnriquecidas;
+    } catch (error) {
+      console.error('❌ Error obteniendo variantes enriquecidas:', error);
+      return [];
+    }
+  },
 
   // ============ CATEGORÍAS ============
   

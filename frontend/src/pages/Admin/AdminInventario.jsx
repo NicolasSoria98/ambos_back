@@ -26,55 +26,23 @@ export default function AdminInventario() {
     try {
       setLoading(true);
 
-      // Obtener todos los productos con sus variantes
-      const response = await productsService.getAll();
-      const productos = response.results || response || [];
+      // Obtener todas las variantes con información enriquecida
+      const variantesEnriquecidas = await productsService.getAllVariantesEnriquecidas();
 
-      console.log('📦 Productos obtenidos:', productos.length);
+      console.log('✅ Total de variantes cargadas:', variantesEnriquecidas.length);
 
-      // Expandir variantes de cada producto
-      const todasVariantes = [];
-      
-      for (const producto of productos) {
-        // Si el producto tiene variantes en la respuesta, usarlas
-        if (producto.variantes && producto.variantes.length > 0) {
-          producto.variantes.forEach(variante => {
-            todasVariantes.push({
-              ...variante,
-              producto_nombre: producto.nombre,
-              producto_precio: producto.precio_base || producto.precio,
-              producto_imagen: producto.imagen_principal_url,
-              producto_categoria: producto.categoria_nombre,
-              producto_descripcion: producto.descripcion,
-              producto_obj: producto
-            });
-          });
-        } else {
-          // Si no tiene variantes en la respuesta, obtenerlas del endpoint específico
-          try {
-            const variantesResponse = await productsService.getVariantes(producto.id);
-            const variantesArray = variantesResponse.results || variantesResponse || [];
-            
-            if (variantesArray.length > 0) {
-              variantesArray.forEach(variante => {
-                todasVariantes.push({
-                  ...variante,
-                  producto_nombre: producto.nombre,
-                  producto_precio: producto.precio_base || producto.precio,
-                  producto_imagen: producto.imagen_principal_url,
-                  producto_categoria: producto.categoria_nombre,
-                  producto_descripcion: producto.descripcion,
-                  producto_obj: producto
-                });
-              });
-            }
-          } catch (error) {
-            console.error(`Error obteniendo variantes del producto ${producto.id}:`, error);
-          }
-        }
-      }
+      // Mapear para agregar información del producto
+      const todasVariantes = variantesEnriquecidas.map(variante => ({
+        ...variante,
+        producto_nombre: variante.producto?.nombre || 'Sin nombre',
+        producto_precio: variante.producto?.precio_base || variante.producto?.precio || 0,
+        producto_imagen: variante.producto?.imagen_principal_url,
+        producto_categoria: variante.producto?.categoria_nombre,
+        producto_descripcion: variante.producto?.descripcion,
+        producto_obj: variante.producto
+      }));
 
-      console.log('✅ Total de variantes cargadas:', todasVariantes.length);
+      console.log('📦 Ejemplo de variante:', todasVariantes[0]);
 
       setVariantes(todasVariantes);
     } catch (error) {
@@ -106,8 +74,10 @@ export default function AdminInventario() {
       switch (ordenamiento) {
         case 'nombre':
           return a.producto_nombre.localeCompare(b.producto_nombre);
-        case 'precio':
+        case 'precio-mayor':
           return (b.producto_precio || 0) - (a.producto_precio || 0);
+        case 'precio-menor':
+          return (a.producto_precio || 0) - (b.producto_precio || 0);
         case 'stock':
           return a.stock - b.stock;
         default:
@@ -196,7 +166,6 @@ export default function AdminInventario() {
                 <option value="normal">Stock normal (&gt;10)</option>
               </select>
             </div>
-
             {/* Ordenamiento */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -209,7 +178,8 @@ export default function AdminInventario() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               >
                 <option value="nombre">Nombre (A-Z)</option>
-                <option value="precio">Precio (Mayor a Menor)</option>
+                <option value="precio-menor">Precio (Menor a Mayor)</option>
+                <option value="precio-mayor">Precio (Mayor a Menor)</option>
                 <option value="stock">Stock (Menor a Mayor)</option>
               </select>
             </div>
