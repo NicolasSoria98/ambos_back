@@ -17,6 +17,8 @@ import KPICard from '../../components/admin/KpiCard';
 import ChartCard from '../../components/admin/Chartcard';
 import analyticsService from '../../services/analytics';
 import productsService from '../../services/products';
+import ordersService from '../../services/orders';
+
 
 // Registrar componentes de Chart.js
 ChartJS.register(
@@ -35,6 +37,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [kpis, setKpis] = useState({});
   const [topProductos, setTopProductos] = useState([]);
+  const [categoriasVendidas, setCategoriasVendidas] = useState([]);
   const [variantesStockBajo, setVariantesStockBajo] = useState([]);
   const [ventasPorPagos, setVentasPorPagos] = useState([]);
   const [categorias, setCategorias] = useState([]);
@@ -166,10 +169,78 @@ export default function AdminDashboard() {
       }
       setVentasPorPagos(ventasPorDia);
 
-      // ========== CATEGORÍAS ==========
-      const categoriasData = await productsService.getCategories();
-      setCategorias(categoriasData);
+// Obtener pedidos de los últimos 30 días a partir de los pagos aprobados
+const categoriasCantidad = {};
+      let totalUnidadesVendidas = 0;
 
+      console.log('🔍 Procesando pagos para categorías:', todosPagosDelMes.pagos.length);
+
+      // Procesar cada pago aprobado
+      for (const pago of todosPagosDelMes.pagos) {
+        try {
+          // Obtener el pedido asociado al pago
+          const pedidoId = pago.pedido;
+          if (!pedidoId) continue;
+
+          const pedido = await ordersService.getById(pedidoId);
+          
+          // Procesar los items del pedido
+          if (pedido.items && Array.isArray(pedido.items)) {
+            for (const item of pedido.items) {
+              const cantidad = parseInt(item.cantidad) || 0;
+              let categoria = 'Sin categoría';
+
+              // Intentar obtener categoría del item
+              if (item.producto?.categoria_nombre) {
+                categoria = item.producto.categoria_nombre;
+              } else if (item.categoria_nombre) {
+                categoria = item.categoria_nombre;
+              } else if (item.producto) {
+                // Si el producto viene como objeto pero sin categoria_nombre expandido
+                // Obtener el producto completo
+                try {
+                  const productoId = typeof item.producto === 'number' ? item.producto : item.producto.id;
+                  if (productoId) {
+                    const productoCompleto = await productsService.getById(productoId);
+                    categoria = productoCompleto.categoria_nombre || 'Sin categoría';
+                  }
+                } catch (error) {
+                  console.error(`Error obteniendo producto ${item.producto}:`, error);
+                }
+              }
+
+              console.log(`📦 Item procesado: ${item.nombre_producto || 'Sin nombre'} - Categoría: ${categoria} - Cantidad: ${cantidad}`);
+
+              if (!categoriasCantidad[categoria]) {
+                categoriasCantidad[categoria] = 0;
+              }
+              
+              categoriasCantidad[categoria] += cantidad;
+              totalUnidadesVendidas += cantidad;
+            }
+          }
+        } catch (error) {
+          console.error(`❌ Error procesando pedido del pago ${pago.id}:`, error);
+        }
+      }
+
+      console.log('📊 Total de unidades vendidas:', totalUnidadesVendidas);
+      console.log('📊 Categorías encontradas:', Object.keys(categoriasCantidad));
+
+      // Convertir a array con porcentajes y ordenar
+      const categoriasConPorcentaje = Object.entries(categoriasCantidad)
+        .map(([nombre, cantidad]) => ({
+          nombre,
+          cantidad,
+          porcentaje: totalUnidadesVendidas > 0 
+            ? ((cantidad / totalUnidadesVendidas) * 100).toFixed(1)
+            : 0
+        }))
+        .sort((a, b) => b.cantidad - a.cantidad)
+        .slice(0, 5); // Top 5 categorías
+
+      console.log('✅ Categorías vendidas (últimos 30 días):', categoriasConPorcentaje);
+      setCategoriasVendidas(categoriasConPorcentaje);
       // ========== PRODUCTOS INACTIVOS ==========
       const todosLosProductos = await productsService.getAll();
       const productos = todosLosProductos.results || todosLosProductos || [];
@@ -230,10 +301,10 @@ export default function AdminDashboard() {
 
   // Preparar datos para el gráfico de categorías
   const categoriasChartData = {
-    labels: categorias.slice(0, 5).map((c) => c.nombre),
+    labels: categoriasVendidas.map((c) => `${c.nombre} (${c.porcentaje}%)`),
     datasets: [
       {
-        data: categorias.slice(0, 5).map(() => Math.random() * 100),
+        data: categoriasVendidas.map((c) => parseFloat(c.porcentaje)),
         backgroundColor: [
           'rgba(99, 102, 241, 0.8)',
           'rgba(34, 197, 94, 0.8)',
@@ -246,7 +317,7 @@ export default function AdminDashboard() {
     ],
   };
 
-  const categoriasChartOptions = {
+const categoriasChartOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
@@ -256,6 +327,17 @@ export default function AdminDashboard() {
           padding: 10,
           font: {
             size: 11,
+          },
+        },
+      },
+      tooltip: {
+        callbacks: {
+          label: (context) => {
+            const categoria = categoriasVendidas[context.dataIndex];
+            return [
+              `${context.label}`,
+              `Unidades: ${categoria.cantidad}`,
+            ];
           },
         },
       },
@@ -406,7 +488,7 @@ export default function AdminDashboard() {
           </ChartCard>
 
           {/* Ventas por Categoría */}
-          <ChartCard title="Top Categorías" icon="fas fa-chart-pie">
+          <ChartCard title="Categorías vendidas (últimos 30 días)" icon="fas fa-chart-pie">
             <div className="relative" style={{ height: '250px' }}>
               <Doughnut data={categoriasChartData} options={categoriasChartOptions} />
             </div>
