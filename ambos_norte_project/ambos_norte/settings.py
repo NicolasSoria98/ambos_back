@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'apps.envios',
     'apps.panel_admin',
     'apps.analytics',
+    'apps.search_insights',
 ]
 
 MIDDLEWARE = [
