@@ -96,6 +96,17 @@ export default function AdminUsuarios() {
   const handleSubmitEdit = async (e) => {
     e.preventDefault();
     
+    // Validar si el email ya existe en otro usuario
+    const emailExiste = usuarios.some(
+      usuario => usuario.email.toLowerCase() === formData.email.toLowerCase() && 
+                 usuario.id !== selectedUsuario.id
+    );
+
+    if (emailExiste) {
+      alert('El email ya está registrado en otro usuario. Por favor, utiliza un email diferente.');
+      return;
+    }
+
     try {
       // Si no se proporciona password, no enviarlo
       const dataToSend = { ...formData };
@@ -127,6 +138,16 @@ export default function AdminUsuarios() {
     // Validar longitud mínima de contraseña
     if (formData.password.length < 8) {
       alert('La contraseña debe tener al menos 8 caracteres');
+      return;
+    }
+
+    // Validar si el email ya existe
+    const emailExiste = usuarios.some(
+      usuario => usuario.email.toLowerCase() === formData.email.toLowerCase()
+    );
+
+    if (emailExiste) {
+      alert('El email ya está registrado. Por favor, utiliza un email diferente.');
       return;
     }
 
