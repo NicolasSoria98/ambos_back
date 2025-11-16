@@ -4,32 +4,47 @@ import productsService from '../../services/products';
 
 export default function AdminInventario() {
   const [loading, setLoading] = useState(true);
-  const [stockBajo, setStockBajo] = useState([]);
-  const [valorInventario, setValorInventario] = useState(0);
-  const [sinStock, setSinStock] = useState(0);
+  const [variantes, setVariantes] = useState([]);
+  const [variantesFiltradas, setVariantesFiltradas] = useState([]);
+  const [selectedVariante, setSelectedVariante] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+
+  // Filtros
+  const [filtroNombre, setFiltroNombre] = useState('');
+  const [filtroStock, setFiltroStock] = useState('todos'); // 'todos', 'normal', 'bajo'
+  const [ordenamiento, setOrdenamiento] = useState('nombre'); // 'nombre', 'precio', 'stock'
 
   useEffect(() => {
     loadInventarioData();
   }, []);
 
+  useEffect(() => {
+    aplicarFiltrosYOrdenamiento();
+  }, [variantes, filtroNombre, filtroStock, ordenamiento]);
+
   const loadInventarioData = async () => {
     try {
       setLoading(true);
 
-      // Cargar productos con stock bajo
-      const productos = await productsService.getLowStockProducts(10);
-      setStockBajo(productos);
+      // Obtener todas las variantes con información enriquecida
+      const variantesEnriquecidas = await productsService.getAllVariantesEnriquecidas();
 
-      // Calcular métricas
-      const totalValue = productos.reduce(
-        (sum, p) => sum + parseFloat(p.precio || 0) * (p.stock || 0),
-        0
-      );
-      setValorInventario(totalValue);
+      console.log('✅ Total de variantes cargadas:', variantesEnriquecidas.length);
 
-      const noStock = productos.filter((p) => p.stock === 0).length;
-      setSinStock(noStock);
+      // Mapear para agregar información del producto
+      const todasVariantes = variantesEnriquecidas.map(variante => ({
+        ...variante,
+        producto_nombre: variante.producto?.nombre || 'Sin nombre',
+        producto_precio: variante.producto?.precio_base || variante.producto?.precio || 0,
+        producto_imagen: variante.producto?.imagen_principal_url,
+        producto_categoria: variante.producto?.categoria_nombre,
+        producto_descripcion: variante.producto?.descripcion,
+        producto_obj: variante.producto
+      }));
 
+      console.log('📦 Ejemplo de variante:', todasVariantes[0]);
+
+      setVariantes(todasVariantes);
     } catch (error) {
       console.error('Error cargando inventario:', error);
     } finally {
@@ -37,12 +52,68 @@ export default function AdminInventario() {
     }
   };
 
+  const aplicarFiltrosYOrdenamiento = () => {
+    let resultado = [...variantes];
+
+    // Filtro por nombre
+    if (filtroNombre.trim()) {
+      resultado = resultado.filter(v => 
+        v.producto_nombre.toLowerCase().includes(filtroNombre.toLowerCase())
+      );
+    }
+
+    // Filtro por stock
+    if (filtroStock === 'bajo') {
+      resultado = resultado.filter(v => v.stock <= 10);
+    } else if (filtroStock === 'normal') {
+      resultado = resultado.filter(v => v.stock > 10);
+    }
+
+    // Ordenamiento
+    resultado.sort((a, b) => {
+      switch (ordenamiento) {
+        case 'nombre':
+          return a.producto_nombre.localeCompare(b.producto_nombre);
+        case 'precio-mayor':
+          return (b.producto_precio || 0) - (a.producto_precio || 0);
+        case 'precio-menor':
+          return (a.producto_precio || 0) - (b.producto_precio || 0);
+        case 'stock':
+          return a.stock - b.stock;
+        default:
+          return 0;
+      }
+    });
+
+    setVariantesFiltradas(resultado);
+  };
+
+  const verDetalles = (variante) => {
+    setSelectedVariante(variante);
+    setShowModal(true);
+  };
+
+  const cerrarModal = () => {
+    setShowModal(false);
+    setSelectedVariante(null);
+  };
+
+  const getStockBadgeColor = (stock) => {
+    if (stock === 0) return 'bg-red-100 text-red-800';
+    if (stock <= 5) return 'bg-orange-100 text-orange-800';
+    if (stock <= 10) return 'bg-yellow-100 text-yellow-800';
+    return 'bg-green-100 text-green-800';
+  };
+
   if (loading) {
     return (
       <div className="flex h-screen">
         <AdminSidebar />
         <div className="flex-1 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600"></div>
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Cargando inventario...</p>
+          </div>
         </div>
       </div>
     );
@@ -51,131 +122,156 @@ export default function AdminInventario() {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <AdminSidebar />
+      
       <main className="flex-1 p-8">
+        {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Gestión de Inventario</h1>
-          <p className="mt-1 text-sm text-gray-600">Control y monitoreo del stock de productos</p>
+          <p className="mt-1 text-sm text-gray-600">
+            Listado completo de productos y variantes
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-3 mb-8">
-          <div className="bg-white overflow-hidden shadow-lg rounded-lg p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="rounded-md bg-indigo-500 p-3">
-                  <i className="fas fa-dollar-sign text-white text-2xl"></i>
-                </div>
-              </div>
-              <div className="ml-5">
-                <dt className="text-sm font-medium text-gray-500">Valor Total Inventario</dt>
-                <dd className="text-2xl font-semibold text-gray-900">
-                  ${valorInventario.toLocaleString()}
-                </dd>
-              </div>
+        {/* Filtros y Controles */}
+        <div className="bg-white shadow-lg rounded-lg p-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Filtro por nombre */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <i className="fas fa-search mr-2"></i>
+                Buscar por nombre
+              </label>
+              <input
+                type="text"
+                placeholder="Nombre del producto..."
+                value={filtroNombre}
+                onChange={(e) => setFiltroNombre(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              />
+            </div>
+
+            {/* Filtro por stock */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <i className="fas fa-filter mr-2"></i>
+                Filtrar por stock
+              </label>
+              <select
+                value={filtroStock}
+                onChange={(e) => setFiltroStock(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              >
+                <option value="todos">Todos los productos</option>
+                <option value="bajo">Stock bajo (≤10)</option>
+                <option value="normal">Stock normal (&gt;10)</option>
+              </select>
+            </div>
+            {/* Ordenamiento */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <i className="fas fa-sort mr-2"></i>
+                Ordenar por
+              </label>
+              <select
+                value={ordenamiento}
+                onChange={(e) => setOrdenamiento(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              >
+                <option value="nombre">Nombre (A-Z)</option>
+                <option value="precio-menor">Precio (Menor a Mayor)</option>
+                <option value="precio-mayor">Precio (Mayor a Menor)</option>
+                <option value="stock">Stock (Menor a Mayor)</option>
+              </select>
             </div>
           </div>
 
-          <div className="bg-white overflow-hidden shadow-lg rounded-lg p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="rounded-md bg-red-500 p-3">
-                  <i className="fas fa-exclamation-triangle text-white text-2xl"></i>
-                </div>
-              </div>
-              <div className="ml-5">
-                <dt className="text-sm font-medium text-gray-500">Productos Sin Stock</dt>
-                <dd className="text-2xl font-semibold text-gray-900">{sinStock}</dd>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white overflow-hidden shadow-lg rounded-lg p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="rounded-md bg-yellow-500 p-3">
-                  <i className="fas fa-boxes text-white text-2xl"></i>
-                </div>
-              </div>
-              <div className="ml-5">
-                <dt className="text-sm font-medium text-gray-500">Stock Bajo</dt>
-                <dd className="text-2xl font-semibold text-gray-900">{stockBajo.length}</dd>
-              </div>
-            </div>
+          {/* Contador de resultados */}
+          <div className="mt-4 text-sm text-gray-600">
+            Mostrando <span className="font-semibold">{variantesFiltradas.length}</span> de{' '}
+            <span className="font-semibold">{variantes.length}</span> variantes
           </div>
         </div>
 
+        {/* Tabla de inventario */}
         <div className="bg-white shadow-lg rounded-lg overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">
-              <i className="fas fa-exclamation-circle text-red-500 mr-2"></i>
-              Productos con Stock Bajo (≤10 unidades)
-            </h3>
-          </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Producto
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Categoría
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Talla
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Color
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Stock
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Precio
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Estado
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Acciones
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {stockBajo.length > 0 ? (
-                  stockBajo.map((producto) => (
-                    <tr key={producto.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
+                {variantesFiltradas.length > 0 ? (
+                  variantesFiltradas.map((variante, index) => (
+                    <tr key={variante.id || index} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4">
                         <div className="text-sm font-medium text-gray-900">
-                          {producto.nombre}
+                          {variante.producto_nombre}
                         </div>
+                        {variante.producto_categoria && (
+                          <div className="text-xs text-gray-500">
+                            {variante.producto_categoria}
+                          </div>
+                        )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {producto.categoria?.nombre || 'Sin categoría'}
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm text-gray-700">
+                          {variante.talla_nombre || variante.talla?.nombre || 'N/A'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm text-gray-700">
+                          {variante.color_nombre || variante.color?.nombre || 'N/A'}
+                        </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
-                          className={`px-3 py-1 inline-flex text-sm leading-5 font-semibold rounded-full ${
-                            producto.stock === 0
-                              ? 'bg-red-100 text-red-800'
-                              : producto.stock <= 5
-                              ? 'bg-orange-100 text-orange-800'
-                              : 'bg-yellow-100 text-yellow-800'
-                          }`}
+                          className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStockBadgeColor(
+                            variante.stock
+                          )}`}
                         >
-                          {producto.stock} unid.
+                          {variante.stock} unid.
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        ${parseFloat(producto.precio || 0).toLocaleString()}
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        ${parseFloat(variante.producto_precio || 0).toLocaleString()}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span
-                          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            producto.stock === 0
-                              ? 'bg-red-100 text-red-800'
-                              : 'bg-yellow-100 text-yellow-800'
-                          }`}
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <button
+                          onClick={() => verDetalles(variante)}
+                          className="inline-flex items-center px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-md transition-colors"
                         >
-                          {producto.stock === 0 ? 'Sin Stock' : 'Crítico'}
-                        </span>
+                          <i className="fas fa-eye mr-2"></i>
+                          Ver Detalles
+                        </button>
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500">
-                      ✅ No hay productos con stock bajo
+                    <td colSpan="6" className="px-6 py-8 text-center">
+                      <div className="text-gray-500">
+                        <i className="fas fa-inbox text-4xl mb-2"></i>
+                        <p className="text-sm">No se encontraron variantes con los filtros aplicados</p>
+                      </div>
                     </td>
                   </tr>
                 )}
@@ -184,6 +280,130 @@ export default function AdminInventario() {
           </div>
         </div>
       </main>
+
+      {/* Modal de Detalles */}
+      {showModal && selectedVariante && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Header del Modal */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h3 className="text-2xl font-bold text-gray-900">
+                Detalles del Producto
+              </h3>
+              <button
+                onClick={cerrarModal}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <i className="fas fa-times text-2xl"></i>
+              </button>
+            </div>
+
+            {/* Contenido del Modal */}
+            <div className="p-6">
+              {/* Imagen del Producto */}
+              {selectedVariante.producto_imagen && (
+                <div className="mb-6 flex justify-center">
+                  <img
+                    src={selectedVariante.producto_imagen}
+                    alt={selectedVariante.producto_nombre}
+                    className="max-h-64 rounded-lg shadow-md object-cover"
+                  />
+                </div>
+              )}
+
+              {/* Información Principal */}
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-xl font-semibold text-gray-900 mb-2">
+                    {selectedVariante.producto_nombre}
+                  </h4>
+                  {selectedVariante.producto_categoria && (
+                    <p className="text-sm text-gray-500">
+                      <i className="fas fa-tag mr-2"></i>
+                      {selectedVariante.producto_categoria}
+                    </p>
+                  )}
+                </div>
+
+                {/* Descripción */}
+                {selectedVariante.producto_descripcion && (
+                  <div>
+                    <h5 className="text-sm font-medium text-gray-700 mb-1">Descripción:</h5>
+                    <p className="text-sm text-gray-600">{selectedVariante.producto_descripcion}</p>
+                  </div>
+                )}
+
+                {/* Grid de Información */}
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <p className="text-xs text-gray-500 mb-1">Talla</p>
+                    <p className="text-lg font-semibold text-gray-900">
+                      {selectedVariante.talla_nombre || selectedVariante.talla?.nombre || 'N/A'}
+                    </p>
+                  </div>
+
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <p className="text-xs text-gray-500 mb-1">Color</p>
+                    <p className="text-lg font-semibold text-gray-900">
+                      {selectedVariante.color_nombre || selectedVariante.color?.nombre || 'N/A'}
+                    </p>
+                  </div>
+
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <p className="text-xs text-gray-500 mb-1">Stock Disponible</p>
+                    <p className={`text-lg font-semibold ${
+                      selectedVariante.stock === 0 ? 'text-red-600' :
+                      selectedVariante.stock <= 10 ? 'text-yellow-600' :
+                      'text-green-600'
+                    }`}>
+                      {selectedVariante.stock} unidades
+                    </p>
+                  </div>
+
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <p className="text-xs text-gray-500 mb-1">Precio</p>
+                    <p className="text-lg font-semibold text-gray-900">
+                      ${parseFloat(selectedVariante.producto_precio || 0).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Estado del Stock */}
+                <div className="pt-4 border-t">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-700">Estado:</span>
+                    <span
+                      className={`px-4 py-2 rounded-full text-sm font-semibold ${
+                        selectedVariante.stock === 0
+                          ? 'bg-red-100 text-red-800'
+                          : selectedVariante.stock <= 10
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-green-100 text-green-800'
+                      }`}
+                    >
+                      {selectedVariante.stock === 0
+                        ? 'Sin Stock'
+                        : selectedVariante.stock <= 10
+                        ? 'Stock Bajo'
+                        : 'Stock Normal'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer del Modal */}
+            <div className="flex justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+              <button
+                onClick={cerrarModal}
+                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium rounded-lg transition-colors"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

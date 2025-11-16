@@ -122,7 +122,6 @@ class MetricaProductoViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(tasa_conversion__gte=min_conversion)
         
         if ordenar_por:
-            # Ejemplos: -vistas_totales, -ingreso_generado, -tasa_conversion
             queryset = queryset.order_by(ordenar_por)
         
         return queryset

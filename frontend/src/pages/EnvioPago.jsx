@@ -101,7 +101,7 @@ export default function EnvioPago() {
       setLoading(true);
       const rawToken = localStorage.getItem("authToken");
       const token = rawToken && rawToken !== "undefined" && rawToken !== "null" ? rawToken : null;
-      
+
       const pedido = {
         id: Date.now(),
         fecha: new Date().toISOString(),
@@ -117,9 +117,9 @@ export default function EnvioPago() {
         },
         total: totalConEnvio,
       };
-      
+
       let storedOrder = pedido;
-      
+
       try {
         const payload = {
           items: (items || []).map((it) => ({
@@ -142,13 +142,13 @@ export default function EnvioPago() {
           notas: form.notas || "",
           total: totalConEnvio,
         };
-        
+
         if (!token) {
           alert("Inicia sesión para finalizar la compra");
           setLoading(false);
           return;
         }
-        
+
         const res = await fetch(`${import.meta.env.VITE_API_URL}/pedidos/pedido/`, {
           method: "POST",
           headers: {
@@ -157,7 +157,7 @@ export default function EnvioPago() {
           },
           body: JSON.stringify(payload),
         });
-        
+
         if (res.ok) {
           const created = await res.json();
           storedOrder = created || storedOrder;
@@ -179,7 +179,7 @@ export default function EnvioPago() {
         setLoading(false);
         return;
       }
-      
+
       localStorage.setItem("last_order", JSON.stringify(storedOrder));
       try {
         const rawList = localStorage.getItem("orders_local");
@@ -332,7 +332,7 @@ export default function EnvioPago() {
 
   return (
     <section className="h-full min-h-[calc(100vh-6rem)] md:min-h-[calc(100vh-8rem)] bg-[#F0F6F6] px-8 md:px-96 py-8 md:flex md:flex-col md:justify-center">
-      <h1 className="text-2xl md:text-4xl font-bold text-[#084B83] mb-4">
+      <h1 className="text-2xl md:text-4xl font-bold text-[#084B83] mb-4 mt-12">
         Checkout
       </h1>
 
@@ -368,50 +368,6 @@ export default function EnvioPago() {
               Retiro en local (Sin costo)
             </label>
           </div>
-
-          {/* Método de pago */}
-          <div className="mb-4 bg-white rounded-lg p-4 border border-gray-200">
-            <h3 className="font-semibold text-[#084B83] mb-3">Método de pago</h3>
-            <div className="space-y-3">
-              <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition">
-                <input
-                  type="radio"
-                  name="metodoPago"
-                  value="mercadopago"
-                  checked={metodoPago === "mercadopago"}
-                  onChange={() => setMetodoPago("mercadopago")}
-                  className="w-4 h-4"
-                />
-                <div className="flex items-center gap-2">
-                  <img 
-                    src="https://http2.mlstatic.com/storage/logos-api-admin/a5f047d0-9be0-11ec-aad4-c3381f368aaf-xs@2x.png" 
-                    alt="MercadoPago" 
-                    className="h-6"
-                  />
-                  <div>
-                    <p className="font-medium">MercadoPago</p>
-                    <p className="text-xs text-gray-500">Tarjeta de crédito/débito, efectivo</p>
-                  </div>
-                </div>
-              </label>
-
-              <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition">
-                <input
-                  type="radio"
-                  name="metodoPago"
-                  value="efectivo"
-                  checked={metodoPago === "efectivo"}
-                  onChange={() => setMetodoPago("efectivo")}
-                  className="w-4 h-4"
-                />
-                <div>
-                  <p className="font-medium">Efectivo</p>
-                  <p className="text-xs text-gray-500">Pago contra entrega</p>
-                </div>
-              </label>
-            </div>
-          </div>
-
           <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
             <div className="grid md:grid-cols-2 gap-4">
               <div className="flex flex-col">
@@ -578,12 +534,36 @@ export default function EnvioPago() {
               </table>
             </div>
           </div>
+          <div className="mb-4 bg-white rounded-lg p-4 border border-gray-200 mt-4">
+            <h3 className="font-semibold text-[#084B83] mb-3">Método de pago</h3>
+            <div className="space-y-3">
+              <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition">
+                <input
+                  type="radio"
+                  name="metodoPago"
+                  value="mercadopago"
+                  checked={metodoPago === "mercadopago"}
+                  onChange={() => setMetodoPago("mercadopago")}
+                  className="w-4 h-4"
+                />
+                <div className="flex items-center gap-2">
+                  <img
+                    src="https://logowik.com/content/uploads/images/mercado-pago3162.logowik.com.webp"
+                    alt="MercadoPago"
+                    className="h-6"
+                  />
+                  <div>
+                    <p className="font-medium">Mercado Pago</p>
+                  </div>
+                </div>
+              </label>
+            </div>
+          </div>
           <button
             onClick={handleFinalizarCompra}
             disabled={loading}
-            className={`w-full mt-6 uppercase bg-[#084B83] text-white px-8 py-3 rounded-full font-semibold text-sm hover:scale-[1.02] transition-transform duration-200 ${
-              loading ? "opacity-50 cursor-not-allowed" : ""
-            }`}
+            className={`w-full uppercase bg-[#084B83] text-white px-8 py-3 rounded-full font-semibold text-sm hover:scale-[1.02] transition-transform duration-200 ${loading ? "opacity-50 cursor-not-allowed" : ""
+              }`}
           >
             {loading ? "Procesando..." : "Finalizar compra"}
           </button>

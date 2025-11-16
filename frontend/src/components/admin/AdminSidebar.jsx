@@ -36,6 +36,11 @@ export default function AdminSidebar() {
       path: '/admin/usuarios',
       icon: 'fas fa-users',
     },
+    {
+      name: 'Búsquedas Google',
+      path: '/admin/search-insights',
+      icon: 'fas fa-search',
+    },
   ];
 
   const handleLogout = () => {

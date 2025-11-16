@@ -10,6 +10,7 @@ export default function AdminProductos() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [showCategoriaModal, setShowCategoriaModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategoria, setFilterCategoria] = useState('');
@@ -26,6 +27,12 @@ export default function AdminProductos() {
     imagen_principal: null
   });
 
+  // Estado para nueva categoría
+  const [nuevaCategoria, setNuevaCategoria] = useState({
+    nombre: '',
+    descripcion: ''
+  });
+
   // Estado para las variantes con imágenes
   const [variantes, setVariantes] = useState([
     { 
@@ -33,8 +40,8 @@ export default function AdminProductos() {
       color: '', 
       stock: 0, 
       activo: true,
-      imagenes: [],  // Array de archivos File
-      imagenesExistentes: [] // Array de URLs de imágenes ya subidas
+      imagenes: [],
+      imagenesExistentes: []
     }
   ]);
 
@@ -61,6 +68,41 @@ export default function AdminProductos() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Crear nueva categoría
+  const handleCrearCategoria = async (e) => {
+    e.preventDefault();
+    
+    if (!nuevaCategoria.nombre.trim()) {
+      alert('El nombre de la categoría es obligatorio');
+      return;
+    }
+
+    try {
+      const categoriaCreada = await productsService.createCategory({
+        nombre: nuevaCategoria.nombre,
+        descripcion: nuevaCategoria.descripcion || ''
+      });
+
+      // Actualizar lista de categorías
+      setCategorias([...categorias, categoriaCreada]);
+      
+      // Seleccionar automáticamente la nueva categoría
+      setFormData(prev => ({
+        ...prev,
+        categoria: categoriaCreada.id
+      }));
+
+      // Limpiar y cerrar modal
+      setNuevaCategoria({ nombre: '', descripcion: '' });
+      setShowCategoriaModal(false);
+      
+      alert('Categoría creada exitosamente');
+    } catch (err) {
+      alert('Error al crear la categoría: ' + err.message);
+      console.error(err);
     }
   };
 
@@ -92,7 +134,6 @@ export default function AdminProductos() {
 
   const handleVarianteImagenesChange = (index, files) => {
     const nuevasVariantes = [...variantes];
-    // Convertir FileList a Array y agregar a las imágenes existentes
     const nuevasImagenes = Array.from(files);
     nuevasVariantes[index].imagenes = [...nuevasVariantes[index].imagenes, ...nuevasImagenes];
     setVariantes(nuevasVariantes);
@@ -145,7 +186,6 @@ export default function AdminProductos() {
     e.preventDefault();
     
     try {
-      // Validar que todas las variantes tengan talla y color
       const variantesValidas = variantes.filter(v => v.talla && v.color);
       
       if (variantesValidas.length === 0) {
@@ -153,7 +193,6 @@ export default function AdminProductos() {
         return;
       }
 
-      // PASO 1: Crear/actualizar el producto sin variantes primero
       const dataToSend = {
         nombre: formData.nombre,
         precio_base: formData.precio_base,
@@ -168,7 +207,6 @@ export default function AdminProductos() {
 
       let productoId;
       
-      // Si hay imagen principal, usar FormData
       if (formData.imagen_principal instanceof File) {
         const formDataToSend = new FormData();
         
@@ -192,7 +230,6 @@ export default function AdminProductos() {
         
         productoId = productoCreado.id;
       } else {
-        // Sin imagen principal, enviar JSON con variantes
         dataToSend.variantes = variantesValidas.map(v => ({
           talla: parseInt(v.talla),
           color: parseInt(v.color),
@@ -209,20 +246,17 @@ export default function AdminProductos() {
 
       console.log('✅ Producto guardado:', productoId);
 
-      // PASO 2: Obtener las variantes creadas del producto
       console.log('📤 Paso 2: Obteniendo variantes creadas...');
       const productoCompleto = await productsService.getById(productoId);
       const variantesCreadas = productoCompleto.variantes;
 
       console.log('✅ Variantes obtenidas:', variantesCreadas);
 
-      // PASO 3: Subir imágenes para cada variante que tenga
       console.log('📤 Paso 3: Subiendo imágenes de variantes...');
       
       for (let i = 0; i < variantesValidas.length; i++) {
         const varianteLocal = variantesValidas[i];
         
-        // Encontrar la variante creada correspondiente
         const varianteCreada = variantesCreadas.find(vc => 
           vc.talla === parseInt(varianteLocal.talla) && 
           vc.color === parseInt(varianteLocal.color)
@@ -240,15 +274,11 @@ export default function AdminProductos() {
           imagenes: varianteLocal.imagenes.length
         });
 
-        // Subir cada imagen de esta variante
         if (varianteLocal.imagenes && varianteLocal.imagenes.length > 0) {
           for (let j = 0; j < varianteLocal.imagenes.length; j++) {
             const imagenFile = varianteLocal.imagenes[j];
             
             console.log(`📷 Subiendo imagen ${j + 1}/${varianteLocal.imagenes.length} para variante ${varianteCreada.id}...`);
-            console.log(`   - Producto ID: ${productoId}`);
-            console.log(`   - Variante ID: ${varianteCreada.id}`);
-            console.log(`   - Archivo: ${imagenFile.name}`);
             
             try {
               const resultado = await productsService.uploadImagen({
@@ -283,7 +313,6 @@ export default function AdminProductos() {
   const handleEdit = async (producto) => {
     setEditingProduct(producto);
     
-    // Cargar datos completos del producto con variantes
     try {
       const productoCompleto = await productsService.getById(producto.id);
       
@@ -298,7 +327,6 @@ export default function AdminProductos() {
         imagen_principal: null
       });
 
-      // Cargar variantes existentes con sus imágenes
       if (productoCompleto.variantes && productoCompleto.variantes.length > 0) {
         setVariantes(productoCompleto.variantes.map(v => ({
           id: v.id,
@@ -306,8 +334,8 @@ export default function AdminProductos() {
           color: v.color,
           stock: v.stock,
           activo: v.activo,
-          imagenes: [], // Nuevas imágenes a subir
-          imagenesExistentes: v.imagenes || [] // Imágenes ya subidas
+          imagenes: [],
+          imagenesExistentes: v.imagenes || []
         })));
       } else {
         setVariantes([{ 
@@ -568,7 +596,7 @@ export default function AdminProductos() {
         </div>
       </div>
 
-      {/* Modal de crear/editar */}
+      {/* Modal de crear/editar producto */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
@@ -625,18 +653,29 @@ export default function AdminProductos() {
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Categoría *
                       </label>
-                      <select
-                        name="categoria"
-                        value={formData.categoria}
-                        onChange={handleInputChange}
-                        required
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                      >
-                        <option value="">Seleccionar categoría</option>
-                        {categorias.map(cat => (
-                          <option key={cat.id} value={cat.id}>{cat.nombre}</option>
-                        ))}
-                      </select>
+                      <div className="flex gap-2">
+                        <select
+                          name="categoria"
+                          value={formData.categoria}
+                          onChange={handleInputChange}
+                          required
+                          className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        >
+                          <option value="">Seleccionar categoría</option>
+                          {categorias.map(cat => (
+                            <option key={cat.id} value={cat.id}>{cat.nombre}</option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => setShowCategoriaModal(true)}
+                          className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition flex items-center gap-2"
+                          title="Crear nueva categoría"
+                        >
+                          <i className="fas fa-plus"></i>
+                          Nueva
+                        </button>
+                      </div>
                     </div>
 
                     <div>
@@ -712,7 +751,7 @@ export default function AdminProductos() {
                   </div>
                 </div>
 
-                {/* VARIANTES (TALLAS Y COLORES CON IMÁGENES) */}
+                {/* VARIANTES */}
                 <div className="border-b pb-4">
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-semibold text-gray-700">
@@ -813,7 +852,7 @@ export default function AdminProductos() {
                             className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent mb-3"
                           />
 
-                          {/* Preview de imágenes existentes (al editar) */}
+                          {/* Preview de imágenes existentes */}
                           {variante.imagenesExistentes && variante.imagenesExistentes.length > 0 && (
                             <div className="mb-3">
                               <p className="text-xs text-gray-600 mb-2">Imágenes actuales:</p>
@@ -903,6 +942,82 @@ export default function AdminProductos() {
                       resetForm();
                     }}
                     className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 rounded-lg transition font-medium"
+                  >
+                    <i className="fas fa-times mr-2"></i>
+                    Cancelar
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de crear nueva categoría */}
+      {showCategoriaModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-lg max-w-md w-full">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-gray-800">
+                  <i className="fas fa-folder-plus mr-2 text-green-600"></i>
+                  Nueva Categoría
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowCategoriaModal(false);
+                    setNuevaCategoria({ nombre: '', descripcion: '' });
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <i className="fas fa-times text-xl"></i>
+                </button>
+              </div>
+
+              <form onSubmit={handleCrearCategoria} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nombre de la categoría *
+                  </label>
+                  <input
+                    type="text"
+                    value={nuevaCategoria.nombre}
+                    onChange={(e) => setNuevaCategoria({ ...nuevaCategoria, nombre: e.target.value })}
+                    placeholder="Ej: Remeras, Pantalones, etc."
+                    required
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    autoFocus
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Descripción (opcional)
+                  </label>
+                  <textarea
+                    value={nuevaCategoria.descripcion}
+                    onChange={(e) => setNuevaCategoria({ ...nuevaCategoria, descripcion: e.target.value })}
+                    placeholder="Descripción de la categoría"
+                    rows={3}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="submit"
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg transition font-medium"
+                  >
+                    <i className="fas fa-check mr-2"></i>
+                    Crear Categoría
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCategoriaModal(false);
+                      setNuevaCategoria({ nombre: '', descripcion: '' });
+                    }}
+                    className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 rounded-lg transition font-medium"
                   >
                     <i className="fas fa-times mr-2"></i>
                     Cancelar

@@ -4,20 +4,32 @@ import authService from "../services/auth";
 
 export default function Navbar() {
   const location = useLocation();
+  const navigate = useNavigate();
+
   const isRegistro = location.pathname.startsWith("/registro");
 
   const [usuario, setUsuario] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const navigate = useNavigate();
+  const [isLoggedIn, setIsLoggedIn] = useState(authService.isAuthenticated());
 
   useEffect(() => {
-    if (authService.isAuthenticated()) {
-      authService
-        .getProfile()
-        .then((data) => setUsuario(data))
-        .catch(() => setUsuario({ nombre: "Usuario" }));
-    }
-  }, []);
+    const loadProfile = async () => {
+      if (authService.isAuthenticated()) {
+        setIsLoggedIn(true);
+        try {
+          const data = await authService.getProfile();
+          setUsuario(data);
+        } catch {
+          setUsuario(null);
+        }
+      } else {
+        setIsLoggedIn(false);
+        setUsuario(null);
+      }
+    };
+
+    loadProfile();
+  }, [location.pathname]);
 
   const handleLogout = () => {
     try {
@@ -25,94 +37,198 @@ export default function Navbar() {
       setUsuario(null);
       setMenuOpen(false);
       navigate("/");
-    } catch (_) {
-      // noop
-    }
+    } catch (_) { }
   };
 
+  const isActive = (path) => location.pathname === path;
+
+  const linkClasses = (path) =>
+    `relative px-4 py-1 rounded-full text-sm md:text-base transition-colors duration-200 uppercase ${isActive(path)
+      ? "font-bold"
+      : "font-medium"
+    }`;
+
   return (
-    <nav className="fixed top-0 left-0 z-50 w-full bg-[#BBE6E4]">
+    <nav
+      className="fixed top-0 left-0 z-50 w-full transition-colors duration-300 bg-[#F0F6F6]/95 backdrop-blur">
       <div className="mx-4 md:mx-12 px-2 sm:px-4 md:px-16">
-        <div className="text-[#084B83] flex h-12 md:h-16 items-center justify-between">
-          <Link to="/" className="text-sm md:text-lg font-bold rounded-xl bg-white py-1 px-4" onClick={() => setMenuOpen(false)}>
-            <span>★ AMBOS NORTE</span>
+        <div className="flex items-center justify-between h-16 md:h-20 text-[#084B83]">
+          <Link
+            to="/"
+            className="flex items-center"
+            onClick={() => setMenuOpen(false)}
+          >
+            <img
+              src="https://oh-wear.com/wp-content/uploads/2022/03/Logo-header.png.webp"
+              alt="oh!"
+              className="h-4 w-auto object-contain"
+            />
+            <span className="font-bold text-sm md:text-base">
+              AMBOS NORTE
+            </span>
           </Link>
-          <ul className="hidden md:flex items-center gap-4 md:gap-8 text-sm md:text-base">
+          <ul className="hidden md:flex items-center gap-4 lg:gap-6">
             <li>
-              <Link to="/">Home</Link>
+              <Link to="/" className={linkClasses("/")}>
+                Inicio
+              </Link>
             </li>
             <li>
-              <Link to="/catalogo">Productos</Link>
+              <Link to="/catalogo" className={linkClasses("/catalogo")}>
+                Productos
+              </Link>
             </li>
             <li>
-              <Link to="/contacto">Contacto</Link>
+              <Link to="/contacto" className={linkClasses("/contacto")}>
+                Contacto
+              </Link>
             </li>
-            <li>
-              <Link to="/carrito">Carrito</Link>
-            </li>
+            {isLoggedIn && (
+              <li>
+                <Link to="/carrito" className={linkClasses("/carrito")}>
+                  Carrito
+                </Link>
+              </li>
+            )}
+          </ul>
+          <div className="hidden md:flex items-center gap-4">
             {!isRegistro && (
               <>
                 {usuario ? (
-                  <Link to="/perfil" className="hidden md:inline-flex items-center text-sm md:text-base font-semibold">
-                    {usuario.first_name ? usuario.first_name : "Mi perfil"}
-                  </Link>
+                  <>
+                    <Link
+                      to="/perfil"
+                      className="text-sm md:text-base font-semibold"
+                    >
+                      {usuario.first_name ? usuario.first_name : "Mi perfil"}
+                    </Link>
+                    <button
+                      onClick={handleLogout}
+                      className="text-sm md:text-base font-semibold text-[#084B83] hover:opacity-80 transition-opacity"
+                    >
+                      Cerrar sesión
+                    </button>
+                  </>
                 ) : (
-                  <Link to="/registro" className="hidden md:inline-flex items-center text-sm md:text-base font-semibold">
+                  <Link
+                    to="/registro"
+                    className="px-6 py-3 rounded-xl bg-[#BBE6E4] text-sm md:text-base font-bold uppercase hover:bg-[#A7DCDC] transition-colors"
+                  >
                     Iniciar sesión
                   </Link>
                 )}
               </>
             )}
-            {usuario && (
-              <li>
-                <button onClick={handleLogout} className="hidden md:inline-flex items-center text-sm md:text-base font-semibold text-[#084B83]">
-                  Cerrar sesión
-                </button>
-              </li>
-            )}
-          </ul>
+          </div>
           <button
-            className="md:hidden text-[#084B83] text-2xl p-2"
-            aria-label="Abrir menú"
-            onClick={() => setMenuOpen((v) => !v)}
+            className="md:hidden inline-flex items-center justify-center rounded-md focus:outline-none"
+            onClick={() => setMenuOpen((prev) => !prev)}
           >
-            {menuOpen ? "✕" : "☰"}
+            <span className="sr-only">Abrir menú</span>
+            {menuOpen ? (
+              <svg
+                className="h-6 w-6"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            ) : (
+              <svg
+                className="h-6 w-6"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
+              </svg>
+            )}
           </button>
         </div>
-        <div className={`md:hidden ${menuOpen ? "block" : "hidden"} pb-4`}>
-          <ul className="flex flex-col gap-3 text-[#084B83] text-base">
-            <li>
-              <Link to="/" onClick={() => setMenuOpen(false)}>Home</Link>
-            </li>
-            <li>
-              <Link to="/catalogo" onClick={() => setMenuOpen(false)}>Productos</Link>
-            </li>
-            <li>
-              <Link to="/contacto" onClick={() => setMenuOpen(false)}>Contacto</Link>
-            </li>
-            <li>
-              <Link to="/carrito" onClick={() => setMenuOpen(false)}>Carrito</Link>
-            </li>
-            {!isRegistro && (
+        {menuOpen && (
+          <div className="md:hidden mt-2 rounded-lg bg-[#F0F6F6]/95 border border-[#BBE6E4] shadow">
+            <ul className="flex flex-col gap-3 px-4 py-3 text-sm font-semibold text-[#084B83]">
               <li>
-                {usuario ? (
-                  <div className="flex flex-col items-start">
-                    <Link to="/perfil" onClick={() => setMenuOpen(false)} className="font-semibold">
-                      Mi perfil
-                    </Link>
-                    <button onClick={handleLogout} className="font-semibold text-red-500">
-                      Cerrar sesión
-                    </button>
-                  </div>
-                ) : (
-                  <Link to="/registro" onClick={() => setMenuOpen(false)} className="font-semibold">
-                    Iniciar sesión
-                  </Link>
-                )}
+                <Link
+                  to="/"
+                  onClick={() => setMenuOpen(false)}
+                  className="block py-1"
+                >
+                  Inicio
+                </Link>
               </li>
-            )}
-          </ul>
-        </div>
+              <li>
+                <Link
+                  to="/catalogo"
+                  onClick={() => setMenuOpen(false)}
+                  className="block py-1"
+                >
+                  Productos
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/contacto"
+                  onClick={() => setMenuOpen(false)}
+                  className="block py-1"
+                >
+                  Contacto
+                </Link>
+              </li>
+              {isLoggedIn && (
+                <li>
+                  <Link
+                    to="/carrito"
+                    onClick={() => setMenuOpen(false)}
+                    className="block py-1"
+                  >
+                    Carrito
+                  </Link>
+                </li>
+              )}
+              {!isRegistro && (
+                <li className="pt-1 border-t border-[#BBE6E4]/60 mt-1">
+                  {usuario ? (
+                    <div className="flex flex-col items-start gap-1">
+                      <Link
+                        to="/perfil"
+                        onClick={() => setMenuOpen(false)}
+                      >
+                        {usuario.first_name ? usuario.first_name : "Mi perfil"}
+                      </Link>
+                      <button
+                        onClick={handleLogout}
+                        className="text-red-500"
+                      >
+                        Cerrar sesión
+                      </button>
+                    </div>
+                  ) : (
+                    <Link
+                      to="/registro"
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      Iniciar sesión
+                    </Link>
+                  )}
+                </li>
+              )}
+            </ul>
+          </div>
+        )}
       </div>
     </nav>
   );

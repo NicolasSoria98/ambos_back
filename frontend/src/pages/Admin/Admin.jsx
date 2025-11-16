@@ -17,6 +17,7 @@ import KPICard from '../../components/admin/KpiCard';
 import ChartCard from '../../components/admin/Chartcard';
 import analyticsService from '../../services/analytics';
 import productsService from '../../services/products';
+import ordersService from '../../services/orders';
 
 // Registrar componentes de Chart.js
 ChartJS.register(
@@ -35,61 +36,275 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [kpis, setKpis] = useState({});
   const [topProductos, setTopProductos] = useState([]);
-  const [stockBajo, setStockBajo] = useState([]);
-  const [metricasDiarias, setMetricasDiarias] = useState([]);
+  const [categoriasVendidas, setCategoriasVendidas] = useState([]);
+  const [variantesStockBajo, setVariantesStockBajo] = useState([]);
+  const [ventasPorPagos, setVentasPorPagos] = useState([]);
   const [categorias, setCategorias] = useState([]);
+  const [productosInactivos, setProductosInactivos] = useState(0);
 
   useEffect(() => {
     loadDashboardData();
   }, []);
 
+  // Función para formatear fecha en formato local YYYY-MM-DD
+  const formatoFechaLocal = (fecha) => {
+    const year = fecha.getFullYear();
+    const month = String(fecha.getMonth() + 1).padStart(2, '0');
+    const day = String(fecha.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const loadDashboardData = async () => {
     try {
       setLoading(true);
 
-      // Cargar KPIs
+      // Fecha de hoy y ayer (usando hora local)
+      const hoy = new Date();
+      hoy.setHours(0, 0, 0, 0); // Resetear hora para comparaciones
+      
+      const ayer = new Date(hoy);
+      ayer.setDate(hoy.getDate() - 1);
+
+      // ========== VENTAS POR PAGOS APROBADOS ==========
+      const ventasHoyData = await analyticsService.getVentasPorPagosAprobados(
+        formatoFechaLocal(hoy),
+        formatoFechaLocal(hoy)
+      );
+      const ventasAyerData = await analyticsService.getVentasPorPagosAprobados(
+        formatoFechaLocal(ayer),
+        formatoFechaLocal(ayer)
+      );
+
+      const ventasHoy = ventasHoyData.total || 0;
+      const ventasAyer = ventasAyerData.total || 0;
+      const cambioVentas = ventasAyer > 0 
+        ? ((ventasHoy - ventasAyer) / ventasAyer) * 100 
+        : 0;
+
+      const cantidadPagosHoy = ventasHoyData.cantidad_pagos || 0;
+      const cantidadPagosAyer = ventasAyerData.cantidad_pagos || 0;
+      const cambioPagos = cantidadPagosAyer > 0
+        ? ((cantidadPagosHoy - cantidadPagosAyer) / cantidadPagosAyer) * 100
+        : 0;
+
+      // ========== PEDIDOS ==========
+      const todosPedidosResponse = await ordersService.getAll();
+      const todosPedidos = todosPedidosResponse.results || todosPedidosResponse || [];
+
+      console.log('📦 Total de pedidos obtenidos:', todosPedidos.length);
+
+      // Filtrar pedidos de hoy
+      const pedidosHoy = todosPedidos.filter(pedido => {
+        if (!pedido.fecha_pedido) return false;
+        const fechaPedido = pedido.fecha_pedido.split('T')[0];
+        return fechaPedido === formatoFechaLocal(hoy);
+      });
+
+      // Filtrar pedidos de ayer
+      const pedidosAyer = todosPedidos.filter(pedido => {
+        if (!pedido.fecha_pedido) return false;
+        const fechaPedido = pedido.fecha_pedido.split('T')[0];
+        return fechaPedido === formatoFechaLocal(ayer);
+      });
+
+      const cantidadPedidosHoy = pedidosHoy.length;
+      const cantidadPedidosAyer = pedidosAyer.length;
+      const cambioPedidos = cantidadPedidosAyer > 0
+        ? ((cantidadPedidosHoy - cantidadPedidosAyer) / cantidadPedidosAyer) * 100
+        : 0;
+
+      console.log('📦 Pedidos de hoy:', cantidadPedidosHoy);
+      console.log('📦 Pedidos de ayer:', cantidadPedidosAyer);
+      console.log('📦 Cambio:', cambioPedidos.toFixed(2) + '%');
+      
+      // Obtener resumen de métricas para usuarios
       const resumenData = await analyticsService.getResumenMetricas();
+      
+      // ========== TOP 5 PRODUCTOS MÁS VENDIDOS ==========
+      const productosVendidosData = await analyticsService.getTopProductosVendidos(5);
+      setTopProductos(productosVendidosData);
+
+      // ========== VARIANTES CON STOCK BAJO (<=10) ==========
+      const variantesStockBajoData = await productsService.getVariantesStockBajo(10);
+      setVariantesStockBajo(variantesStockBajoData);
+
+      // ========== VENTAS ÚLTIMOS 30 DÍAS (POR PAGOS APROBADOS) ==========
+      const hace30Dias = new Date(hoy);
+      hace30Dias.setDate(hoy.getDate() - 29); // 29 días atrás + hoy = 30 días
+
+      console.log('📅 Rango de fechas para ventas:');
+      console.log('  Desde:', formatoFechaLocal(hace30Dias));
+      console.log('  Hasta:', formatoFechaLocal(hoy));
+
+      // Obtener TODOS los pagos aprobados del mes de una sola vez
+      const todosPagosDelMes = await analyticsService.getVentasPorPagosAprobados(
+        formatoFechaLocal(hace30Dias),
+        formatoFechaLocal(hoy)
+      );
+
+      console.log('💰 Pagos del mes obtenidos:', todosPagosDelMes.pagos?.length || 0);
+
+      // ========== TICKET PROMEDIO DEL MES ==========
+      const ticketPromedioMes = todosPagosDelMes.cantidad_pagos > 0 
+        ? todosPagosDelMes.total / todosPagosDelMes.cantidad_pagos 
+        : 0;
+      
+      // Para el cambio, calcular ticket promedio del mes anterior
+      const hace60Dias = new Date(hoy);
+      hace60Dias.setDate(hoy.getDate() - 60);
+      const hace31Dias = new Date(hoy);
+      hace31Dias.setDate(hoy.getDate() - 30);
+      
+      const ventasMesAnteriorData = await analyticsService.getVentasPorPagosAprobados(
+        formatoFechaLocal(hace60Dias),
+        formatoFechaLocal(hace31Dias)
+      );
+      
+      const ticketPromedioMesAnterior = ventasMesAnteriorData.cantidad_pagos > 0 
+        ? ventasMesAnteriorData.total / ventasMesAnteriorData.cantidad_pagos 
+        : 0;
+      
+      const cambioTicket = ticketPromedioMesAnterior > 0
+        ? ((ticketPromedioMes - ticketPromedioMesAnterior) / ticketPromedioMesAnterior) * 100
+        : 0;
+
+      // ========== KPIs ==========
       setKpis({
         ventas: {
-          hoy: resumenData.total_ventas_hoy || 0,
-          cambio: resumenData.cambio_ventas || 0,
+          hoy: ventasHoy,
+          cambio: cambioVentas,
         },
         pedidos: {
-          hoy: resumenData.pedidos_hoy || 0,
-          cambio: resumenData.cambio_pedidos || 0,
+          hoy: cantidadPedidosHoy,
+          cambio: cambioPedidos,
         },
         usuarios: {
           hoy: resumenData.usuarios_activos_hoy || 0,
           cambio: resumenData.cambio_usuarios || 0,
         },
         ticket: {
-          hoy: resumenData.ticket_promedio_hoy || 0,
-          cambio: resumenData.cambio_ticket || 0,
+          hoy: ticketPromedioMes,
+          cambio: cambioTicket,
         },
       });
 
-      // Cargar top productos
-      const productosData = await analyticsService.getTopProductos('ventas', 5);
-      setTopProductos(productosData);
+      // Agrupar pagos por fecha (USANDO FECHA LOCAL)
+      const ventasPorFecha = {};
+      
+      if (todosPagosDelMes.pagos && Array.isArray(todosPagosDelMes.pagos)) {
+        todosPagosDelMes.pagos.forEach(pago => {
+          // Extraer solo la fecha (YYYY-MM-DD) sin conversión de zona horaria
+          const fechaPago = (pago.fecha_pago || pago.fecha_creacion).split('T')[0];
+          
+          console.log(`💳 Pago #${pago.id}: Fecha=${fechaPago}, Monto=${pago.monto}`);
+          
+          if (!ventasPorFecha[fechaPago]) {
+            ventasPorFecha[fechaPago] = 0;
+          }
+          ventasPorFecha[fechaPago] += parseFloat(pago.monto || 0);
+        });
+      }
 
-      // Cargar productos con stock bajo
-      const stockData = await productsService.getLowStockProducts(10);
-      setStockBajo(stockData.slice(0, 10));
+      console.log('📊 Ventas agrupadas por fecha:', ventasPorFecha);
 
-      // Cargar métricas de los últimos 30 días
-      const hoy = new Date();
-      const hace30Dias = new Date();
-      hace30Dias.setDate(hoy.getDate() - 30);
+      // Crear array con todos los días (últimos 30 días incluyendo HOY)
+      const ventasPorDia = [];
+      for (let i = 29; i >= 0; i--) {
+        const fecha = new Date(hoy);
+        fecha.setDate(hoy.getDate() - i);
+        const fechaStr = formatoFechaLocal(fecha);
+        
+        ventasPorDia.push({
+          fecha: fechaStr,
+          total: ventasPorFecha[fechaStr] || 0
+        });
+      }
 
-      const metricas = await analyticsService.getMetricasDiarias({
-        fecha_desde: hace30Dias.toISOString().split('T')[0],
-        fecha_hasta: hoy.toISOString().split('T')[0],
-      });
-      setMetricasDiarias(metricas.results || metricas || []);
+      console.log('📈 Datos para el gráfico:', ventasPorDia);
+      console.log('📅 Primera fecha:', ventasPorDia[0]?.fecha);
+      console.log('📅 Última fecha:', ventasPorDia[ventasPorDia.length - 1]?.fecha);
+      
+      setVentasPorPagos(ventasPorDia);
 
-      // Cargar categorías para el gráfico de dona
-      const categoriasData = await productsService.getCategories();
-      setCategorias(categoriasData);
+      // ========== CATEGORÍAS VENDIDAS ==========
+      const categoriasCantidad = {};
+      let totalUnidadesVendidas = 0;
+
+      console.log('🔍 Procesando pagos para categorías:', todosPagosDelMes.pagos?.length || 0);
+
+      // Procesar cada pago aprobado
+      if (todosPagosDelMes.pagos && Array.isArray(todosPagosDelMes.pagos)) {
+        for (const pago of todosPagosDelMes.pagos) {
+          try {
+            // Obtener el pedido asociado al pago
+            const pedidoId = pago.pedido;
+            if (!pedidoId) continue;
+
+            const pedido = await ordersService.getById(pedidoId);
+            
+            // Procesar los items del pedido
+            if (pedido.items && Array.isArray(pedido.items)) {
+              for (const item of pedido.items) {
+                const cantidad = parseInt(item.cantidad) || 0;
+                let categoria = 'Sin categoría';
+
+                // Intentar obtener categoría del item
+                if (item.producto_info?.categoria_nombre) {
+                  categoria = item.producto_info.categoria_nombre;
+                } else if (item.producto?.categoria_nombre) {
+                  categoria = item.producto.categoria_nombre;
+                } else if (item.categoria_nombre) {
+                  categoria = item.categoria_nombre;
+                } else if (item.producto) {
+                  // Obtener el producto completo
+                  try {
+                    const productoId = typeof item.producto === 'number' ? item.producto : item.producto.id;
+                    if (productoId) {
+                      const productoCompleto = await productsService.getById(productoId);
+                      categoria = productoCompleto.categoria_nombre || 'Sin categoría';
+                    }
+                  } catch (error) {
+                    console.error(`Error obteniendo producto ${item.producto}:`, error);
+                  }
+                }
+
+                if (!categoriasCantidad[categoria]) {
+                  categoriasCantidad[categoria] = 0;
+                }
+                
+                categoriasCantidad[categoria] += cantidad;
+                totalUnidadesVendidas += cantidad;
+              }
+            }
+          } catch (error) {
+            console.error(`❌ Error procesando pedido del pago ${pago.id}:`, error);
+          }
+        }
+      }
+
+      console.log('📊 Total de unidades vendidas:', totalUnidadesVendidas);
+      console.log('📊 Categorías encontradas:', Object.keys(categoriasCantidad));
+
+      // Convertir a array con porcentajes y ordenar
+      const categoriasConPorcentaje = Object.entries(categoriasCantidad)
+        .map(([nombre, cantidad]) => ({
+          nombre,
+          cantidad,
+          porcentaje: totalUnidadesVendidas > 0 
+            ? ((cantidad / totalUnidadesVendidas) * 100).toFixed(1)
+            : 0
+        }))
+        .sort((a, b) => b.cantidad - a.cantidad)
+        .slice(0, 5); // Top 5 categorías
+
+      console.log('✅ Categorías vendidas (últimos 30 días):', categoriasConPorcentaje);
+      setCategoriasVendidas(categoriasConPorcentaje);
+      
+      // ========== PRODUCTOS INACTIVOS ==========
+      const todosLosProductos = await productsService.getAll();
+      const productos = todosLosProductos.results || todosLosProductos || [];
+      const inactivos = productos.filter(p => !p.activo).length;
+      setProductosInactivos(inactivos);
 
     } catch (error) {
       console.error('Error cargando datos del dashboard:', error);
@@ -98,16 +313,16 @@ export default function AdminDashboard() {
     }
   };
 
-  // Preparar datos para el gráfico de líneas (ventas)
+  // Preparar datos para el gráfico de líneas (ventas por pagos aprobados)
   const ventasChartData = {
-    labels: metricasDiarias.map((m) => {
-      const fecha = new Date(m.fecha);
+    labels: ventasPorPagos.map((v) => {
+      const fecha = new Date(v.fecha + 'T00:00:00'); // Agregar hora para evitar problemas de zona horaria
       return `${fecha.getDate()}/${fecha.getMonth() + 1}`;
     }),
     datasets: [
       {
         label: 'Ventas ($)',
-        data: metricasDiarias.map((m) => parseFloat(m.ingreso_bruto) || 0),
+        data: ventasPorPagos.map((v) => v.total),
         borderColor: 'rgb(99, 102, 241)',
         backgroundColor: 'rgba(99, 102, 241, 0.1)',
         tension: 0.4,
@@ -145,10 +360,10 @@ export default function AdminDashboard() {
 
   // Preparar datos para el gráfico de categorías
   const categoriasChartData = {
-    labels: categorias.slice(0, 5).map((c) => c.nombre),
+    labels: categoriasVendidas.map((c) => `${c.nombre} (${c.porcentaje}%)`),
     datasets: [
       {
-        data: categorias.slice(0, 5).map(() => Math.random() * 100),
+        data: categoriasVendidas.map((c) => parseFloat(c.porcentaje)),
         backgroundColor: [
           'rgba(99, 102, 241, 0.8)',
           'rgba(34, 197, 94, 0.8)',
@@ -171,6 +386,17 @@ export default function AdminDashboard() {
           padding: 10,
           font: {
             size: 11,
+          },
+        },
+      },
+      tooltip: {
+        callbacks: {
+          label: (context) => {
+            const categoria = categoriasVendidas[context.dataIndex];
+            return [
+              `${context.label}`,
+              `Unidades: ${categoria.cantidad}`,
+            ];
           },
         },
       },
@@ -228,7 +454,7 @@ export default function AdminDashboard() {
             color="yellow"
           />
           <KPICard
-            title="Ticket Promedio"
+            title="Ticket Promedio (Mes)"
             value={`$${kpis.ticket?.hoy?.toLocaleString() || 0}`}
             change={kpis.ticket?.cambio}
             icon="fas fa-receipt"
@@ -240,30 +466,30 @@ export default function AdminDashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
           {/* Gráfico de Ventas */}
           <div className="lg:col-span-2">
-            <ChartCard title="Ventas Últimos 30 Días" icon="fas fa-chart-line">
+            <ChartCard title="Ventas Últimos 30 Días (Pagos Aprobados)" icon="fas fa-chart-line">
               <div className="relative" style={{ height: '300px' }}>
                 <Line data={ventasChartData} options={ventasChartOptions} />
               </div>
             </ChartCard>
           </div>
 
-          {/* Top Productos */}
-          <ChartCard title="Top 5 Productos" icon="fas fa-trophy" iconColor="yellow">
+          {/* Top 5 Productos Más Vendidos */}
+          <ChartCard title="Top 5 Productos Más Vendidos" icon="fas fa-trophy" iconColor="yellow">
             <div className="space-y-4">
               {topProductos.length > 0 ? (
-                topProductos.map((metrica, index) => (
-                  <div key={metrica.producto?.id || index} className="flex items-center">
+                topProductos.map((producto, index) => (
+                  <div key={producto.producto_id || index} className="flex items-center">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">
-                        {metrica.producto_nombre || 'Sin nombre'}
+                        {producto.producto_nombre || 'Sin nombre'}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {metrica.compras_completadas || 0} ventas
+                        {producto.ventas || 0} unidades vendidas
                       </p>
                     </div>
                     <div className="ml-2 flex-shrink-0">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        ${parseFloat(metrica.ingreso_generado || 0).toLocaleString()}
+                        ${producto.ingresos?.toLocaleString() || 0}
                       </span>
                     </div>
                   </div>
@@ -279,38 +505,49 @@ export default function AdminDashboard() {
 
         {/* Widgets adicionales */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Stock Bajo */}
-          <ChartCard title="Stock Bajo" icon="fas fa-exclamation-triangle" iconColor="red">
+          {/* Stock Bajo - VARIANTES */}
+          <ChartCard title="Variantes con Stock Bajo (≤10)" icon="fas fa-exclamation-triangle" iconColor="red">
             <div className="space-y-3 max-h-64 overflow-y-auto">
-              {stockBajo.length > 0 ? (
-                stockBajo.map((producto) => (
-                  <div
-                    key={producto.id}
-                    className="flex items-center justify-between p-2 bg-red-50 rounded"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">
-                        {producto.nombre}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {producto.categoria?.nombre || 'Sin categoría'}
-                      </p>
+              {variantesStockBajo.length > 0 ? (
+                variantesStockBajo.map((variante) => {
+                  // Obtener talla y color de múltiples fuentes posibles
+                  const tallaNombre = variante.talla_nombre || variante.talla_obj?.nombre || variante.talla?.nombre || 'N/A';
+                  const colorNombre = variante.color_nombre || variante.color_obj?.nombre || variante.color?.nombre || 'N/A';
+                  
+                  return (
+                    <div
+                      key={variante.id}
+                      className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-100"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">
+                          {variante.producto?.nombre || 'Producto sin nombre'}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-xs px-2 py-0.5 bg-gray-200 rounded-md font-medium text-gray-700">
+                            Talla: {tallaNombre}
+                          </span>
+                          <span className="text-xs px-2 py-0.5 bg-gray-200 rounded-md font-medium text-gray-700">
+                            Color: {colorNombre}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="ml-2 inline-flex items-center px-3 py-1.5 rounded-full text-sm font-bold bg-red-100 text-red-800">
+                        {variante.stock}
+                      </span>
                     </div>
-                    <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                      {producto.stock} unid.
-                    </span>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <p className="text-sm text-gray-500 text-center py-4">
-                  ✅ Stock normal en todos los productos
+                  ✅ Stock normal en todas las variantes
                 </p>
               )}
             </div>
           </ChartCard>
 
           {/* Ventas por Categoría */}
-          <ChartCard title="Top Categorías" icon="fas fa-chart-pie">
+          <ChartCard title="Categorías vendidas (últimos 30 días)" icon="fas fa-chart-pie">
             <div className="relative" style={{ height: '250px' }}>
               <Doughnut data={categoriasChartData} options={categoriasChartOptions} />
             </div>
@@ -325,18 +562,26 @@ export default function AdminDashboard() {
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Productos activos</span>
-                <span className="text-lg font-semibold">{categorias.length * 10}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Productos sin stock</span>
-                <span className="text-lg font-semibold text-red-600">
-                  {stockBajo.filter((p) => p.stock === 0).length}
+                <span className="text-lg font-semibold">
+                  {categorias.length * 10}
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Tasa conversión</span>
+                <span className="text-sm text-gray-600">Productos inactivos</span>
+                <span className="text-lg font-semibold text-orange-600">
+                  {productosInactivos}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Variantes sin stock</span>
+                <span className="text-lg font-semibold text-red-600">
+                  {variantesStockBajo.filter((v) => v.stock === 0).length}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Ventas del mes</span>
                 <span className="text-lg font-semibold text-green-600">
-                  {kpis.ventas?.hoy > 0 ? '3.2%' : '0%'}
+                  ${ventasPorPagos.reduce((sum, v) => sum + v.total, 0).toLocaleString()}
                 </span>
               </div>
             </div>
