@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Chart as ChartJS,
@@ -12,6 +11,7 @@ import {
   Legend,
 } from 'chart.js';
 import { Line, Bar } from 'react-chartjs-2';
+import AdminSidebar from '../../components/admin/AdminSidebar';
 import searchInsightsService from '../../services/searchInsightsService';
 
 ChartJS.register(
@@ -35,6 +35,13 @@ const AdminGoogle = () => {
   const [keywords, setKeywords] = useState(['']);
   const [keywordInput, setKeywordInput] = useState('');
   const [sugerencias, setSugerencias] = useState([]);
+  const [buscandoSugerencias, setBuscandoSugerencias] = useState(false);
+  
+  // Cache de sugerencias
+  const sugerenciasCache = useRef({});
+  
+  // Debounce timer
+  const debounceTimer = useRef(null);
   
   // Fechas
   const hoy = new Date().toISOString().split('T')[0];
@@ -53,6 +60,8 @@ const AdminGoogle = () => {
   useEffect(() => {
     // Resetear región al cambiar país
     setSelectedRegion('');
+    // Limpiar cache al cambiar país
+    sugerenciasCache.current = {};
   }, [selectedPais]);
 
   const cargarGeoCodes = async () => {
@@ -76,20 +85,59 @@ const AdminGoogle = () => {
     setKeywords(keywords.filter((_, i) => i !== index));
   };
 
-  const handleBuscarSugerencias = async (texto) => {
+  const handleBuscarSugerencias = (texto) => {
     setKeywordInput(texto);
     
-    if (texto.length >= 2) {
+    // Limpiar sugerencias si el texto es muy corto
+    if (texto.length < 2) {
+      setSugerencias([]);
+      setBuscandoSugerencias(false);
+      return;
+    }
+    
+    // Limpiar el timer anterior
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
+    }
+    
+    // Mostrar estado de carga
+    setBuscandoSugerencias(true);
+    
+    // Crear clave de cache
+    const cacheKey = `${selectedPais}:${texto.toLowerCase().trim()}`;
+    
+    // Verificar si ya está en cache
+    if (sugerenciasCache.current[cacheKey]) {
+      setSugerencias(sugerenciasCache.current[cacheKey]);
+      setBuscandoSugerencias(false);
+      return;
+    }
+    
+    // DEBOUNCING: Esperar 600ms después de que el usuario deje de escribir
+    debounceTimer.current = setTimeout(async () => {
       try {
         const data = await searchInsightsService.getSuggestions(texto, selectedPais);
-        setSugerencias(data.sugerencias || []);
+        
+        if (data.success && data.sugerencias) {
+          // Guardar en cache
+          sugerenciasCache.current[cacheKey] = data.sugerencias;
+          setSugerencias(data.sugerencias);
+        } else {
+          // Si hay rate limiting u otro error, no mostrar nada
+          setSugerencias([]);
+          
+          // Si es rate limiting, limpiar cache para que no siga intentando
+          if (data.error && data.error.includes('429')) {
+            console.warn('Google está limitando las peticiones. Intenta más lento.');
+          }
+        }
       } catch (error) {
         console.error('Error buscando sugerencias:', error);
         setSugerencias([]);
+      } finally {
+        setBuscandoSugerencias(false);
       }
-    } else {
-      setSugerencias([]);
-    }
+    }, 600); // 600ms de espera
   };
 
   const handleSeleccionarSugerencia = (sugerencia) => {
@@ -124,11 +172,26 @@ const AdminGoogle = () => {
       
     } catch (error) {
       console.error('Error consultando tendencias:', error);
-      alert('Error al consultar tendencias: ' + (error.response?.data?.error || error.message));
+      
+      // Mensaje más amigable para rate limiting
+      if (error.response?.status === 429 || error.response?.data?.detalle?.includes('429')) {
+        alert('Google está limitando las peticiones. Por favor espera unos minutos e intenta nuevamente.');
+      } else {
+        alert('Error al consultar tendencias: ' + (error.response?.data?.error || error.message));
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  // Limpiar timer al desmontar
+  useEffect(() => {
+    return () => {
+      if (debounceTimer.current) {
+        clearTimeout(debounceTimer.current);
+      }
+    };
+  }, []);
 
   // Preparar datos para gráfico de tendencia temporal
   const getTendenciaChart = () => {
@@ -159,49 +222,54 @@ const AdminGoogle = () => {
     return { labels, datasets };
   };
 
-  // Preparar datos para gráfico regional (mapa de calor)
+  // Preparar datos para gráfico regional (barras comparativas)
   const getRegionalChart = () => {
     if (!resultados?.datos_regionales || resultados.datos_regionales.length === 0) {
       return null;
     }
 
-    // Tomar la primera keyword para el mapa
-    const primeraKeyword = keywords.filter(k => k.trim())[0];
+    const keywordsActivas = keywords.filter(k => k.trim());
     
-    // Ordenar por valor y tomar top 15
+    // Ordenar regiones por el promedio de todas las keywords
     const datosOrdenados = [...resultados.datos_regionales]
-      .sort((a, b) => (b[primeraKeyword] || 0) - (a[primeraKeyword] || 0))
-      .slice(0, 15);
+      .map(region => {
+        const valores = keywordsActivas.map(kw => region[kw] || 0);
+        const promedio = valores.reduce((a, b) => a + b, 0) / valores.length;
+        return { ...region, promedio };
+      })
+      .sort((a, b) => b.promedio - a.promedio)
+      .slice(0, 10); // Top 10 regiones
 
     const labels = datosOrdenados.map(d => d.geoName || d.geoCode);
-    const values = datosOrdenados.map(d => d[primeraKeyword] || 0);
 
-    // Generar colores en gradiente (azul a rojo según intensidad)
-    const maxValue = Math.max(...values);
-    const backgroundColors = values.map(val => {
-      const intensity = maxValue > 0 ? val / maxValue : 0;
-      const r = Math.round(255 * intensity);
-      const b = Math.round(255 * (1 - intensity));
-      return `rgba(${r}, 100, ${b}, 0.8)`;
-    });
+    // Colores distintivos para cada keyword
+    const colores = [
+      { bg: 'rgba(59, 130, 246, 0.8)', border: 'rgb(59, 130, 246)' },      // Azul
+      { bg: 'rgba(16, 185, 129, 0.8)', border: 'rgb(16, 185, 129)' },      // Verde
+      { bg: 'rgba(251, 146, 60, 0.8)', border: 'rgb(251, 146, 60)' },      // Naranja
+      { bg: 'rgba(239, 68, 68, 0.8)', border: 'rgb(239, 68, 68)' },        // Rojo
+      { bg: 'rgba(168, 85, 247, 0.8)', border: 'rgb(168, 85, 247)' },      // Púrpura
+    ];
 
-    return {
-      labels,
-      datasets: [{
-        label: `Interés de "${primeraKeyword}" por región`,
-        data: values,
-        backgroundColor: backgroundColors,
-        borderColor: backgroundColors.map(c => c.replace('0.8', '1')),
-        borderWidth: 1
-      }]
-    };
+    // Crear un dataset por cada keyword
+    const datasets = keywordsActivas.map((kw, index) => ({
+      label: kw,
+      data: datosOrdenados.map(d => d[kw] || 0),
+      backgroundColor: colores[index % colores.length].bg,
+      borderColor: colores[index % colores.length].border,
+      borderWidth: 1,
+    }));
+
+    return { labels, datasets };
   };
 
   const regionesDisponibles = selectedPais === 'AR' ? geoCodes.regiones.argentina || [] : [];
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-7xl mx-auto">
+    <div className="flex min-h-screen bg-gray-50">
+      <AdminSidebar />
+
+      <main className="flex-1 p-8">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
@@ -248,19 +316,26 @@ const AdminGoogle = () => {
             {keywords.filter(k => k.trim()).length < 5 && (
               <div className="relative">
                 <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={keywordInput}
-                    onChange={(e) => handleBuscarSugerencias(e.target.value)}
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleAgregarKeyword();
-                      }
-                    }}
-                    placeholder="Escribe una palabra clave..."
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
+                  <div className="flex-1 relative">
+                    <input
+                      type="text"
+                      value={keywordInput}
+                      onChange={(e) => handleBuscarSugerencias(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAgregarKeyword();
+                        }
+                      }}
+                      placeholder="Escribe una palabra clave..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                    {buscandoSugerencias && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                        <i className="fas fa-spinner fa-spin text-gray-400"></i>
+                      </div>
+                    )}
+                  </div>
                   <button
                     onClick={handleAgregarKeyword}
                     disabled={!keywordInput.trim()}
@@ -290,6 +365,12 @@ const AdminGoogle = () => {
                 )}
               </div>
             )}
+            
+            {/* Nota sobre sugerencias */}
+            <p className="text-xs text-gray-500 mt-2">
+              <i className="fas fa-info-circle mr-1"></i>
+              Las sugerencias aparecen después de escribir (espera un momento después de escribir)
+            </p>
           </div>
 
           {/* Filtros de Ubicación y Fecha */}
@@ -507,17 +588,17 @@ const AdminGoogle = () => {
               </div>
             </div>
 
-            {/* Mapa de Calor Regional */}
+            {/* Gráfico de Barras Regional */}
             {resultados.datos_regionales && resultados.datos_regionales.length > 0 && (
               <div className="bg-white rounded-lg shadow-md p-6 mb-6">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-lg font-semibold text-gray-800">
-                    <i className="fas fa-map-marked-alt mr-2"></i>
-                    Mapa de Calor - Interés por Región
+                    <i className="fas fa-chart-bar mr-2"></i>
+                    Comparación por Región
                   </h3>
                   <button
                     onClick={() => setShowRegionalMap(!showRegionalMap)}
-                    className="text-blue-600 hover:text-blue-800"
+                    className="px-4 py-2 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg transition-colors"
                   >
                     <i className={`fas fa-${showRegionalMap ? 'chart-bar' : 'table'} mr-2`}></i>
                     {showRegionalMap ? 'Ver Gráfico' : 'Ver Tabla'}
@@ -549,7 +630,7 @@ const AdminGoogle = () => {
                             {keywords.filter(k => k.trim()).map(kw => {
                               const valor = region[kw] || 0;
                               const intensidad = valor / 100;
-                              const bgColor = `rgba(${Math.round(255 * intensidad)}, 100, ${Math.round(255 * (1 - intensidad))}, 0.3)`;
+                              const bgColor = `rgba(59, 130, 246, ${intensidad * 0.5})`;
                               
                               return (
                                 <td 
@@ -567,50 +648,61 @@ const AdminGoogle = () => {
                     </table>
                   </div>
                 ) : (
-                  /* Gráfico de barras */
+                  /* Gráfico de barras comparativo */
                   getRegionalChart() && (
-                    <div className="h-96">
-                      <Bar
-                        data={getRegionalChart()}
-                        options={{
-                          responsive: true,
-                          maintainAspectRatio: false,
-                          indexAxis: 'y',
-                          plugins: {
-                            legend: {
-                              display: false
+                    <>
+                      <div className="h-96">
+                        <Bar
+                          data={getRegionalChart()}
+                          options={{
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                              legend: {
+                                position: 'top',
+                                labels: {
+                                  boxWidth: 15,
+                                  padding: 15
+                                }
+                              },
+                              tooltip: {
+                                callbacks: {
+                                  label: function(context) {
+                                    return `${context.dataset.label}: ${context.parsed.y}`;
+                                  }
+                                }
+                              }
                             },
-                            tooltip: {
-                              callbacks: {
-                                label: function(context) {
-                                  return `Interés: ${context.parsed.x}`;
+                            scales: {
+                              y: {
+                                beginAtZero: true,
+                                max: 100,
+                                title: {
+                                  display: true,
+                                  text: 'Interés Relativo (0-100)'
+                                }
+                              },
+                              x: {
+                                title: {
+                                  display: true,
+                                  text: 'Región'
                                 }
                               }
                             }
-                          },
-                          scales: {
-                            x: {
-                              beginAtZero: true,
-                              max: 100,
-                              title: {
-                                display: true,
-                                text: 'Interés Relativo (0-100)'
-                              }
-                            }
-                          }
-                        }}
-                      />
-                    </div>
+                          }}
+                        />
+                      </div>
+                      <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                        <p className="text-sm text-gray-700">
+                          <i className="fas fa-info-circle mr-2"></i>
+                          Este gráfico muestra las {keywords.filter(k => k.trim()).length > 1 ? 'palabras clave' : 'la palabra clave'} comparadas 
+                          en las top 10 regiones con mayor interés promedio. 
+                          Los valores van de 0 a 100, donde 100 representa el máximo interés en esa región.
+                        </p>
+                      </div>
+                    </>
                   )
                 )}
-
-                <div className="mt-4 p-3 bg-yellow-50 rounded-lg">
-                  <p className="text-sm text-gray-700">
-                    <i className="fas fa-fire mr-2"></i>
-                    Los colores más rojos indican mayor intensidad de búsqueda en esa región.
-                    Los valores van de 0 a 100, donde 100 representa la región con mayor interés.
-                  </p>
-                </div>
               </div>
             )}
 
@@ -676,7 +768,7 @@ const AdminGoogle = () => {
             </p>
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 };

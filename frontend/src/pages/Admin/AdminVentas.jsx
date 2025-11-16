@@ -50,6 +50,10 @@ export default function AdminVentas() {
   const [filtroPedido, setFiltroPedido] = useState('');
   const [filtroCliente, setFiltroCliente] = useState('');
 
+  // Estado para el modal de edición
+  const [pagoEditando, setPagoEditando] = useState(null);
+  const [nuevoEstado, setNuevoEstado] = useState('');
+
   // KPIs
   const [kpis, setKpis] = useState({
     totalVentas: 0,
@@ -309,6 +313,7 @@ export default function AdminVentas() {
     const badges = {
       'aprobado': 'bg-green-100 text-green-800',
       'pendiente': 'bg-yellow-100 text-yellow-800',
+      'cancelado': 'bg-red-100 text-red-800',
     };
     return badges[estado] || 'bg-gray-100 text-gray-800';
   };
@@ -317,8 +322,48 @@ export default function AdminVentas() {
     const textos = {
       'aprobado': 'Aprobado',
       'pendiente': 'Pendiente',
+      'cancelado': 'Cancelado',
     };
     return textos[estado] || estado;
+  };
+
+  const abrirModalEdicion = (pago) => {
+    setPagoEditando(pago);
+    setNuevoEstado(pago.estado_pago);
+  };
+
+  const cerrarModalEdicion = () => {
+    setPagoEditando(null);
+    setNuevoEstado('');
+  };
+
+  const cambiarEstadoPago = async () => {
+    if (!pagoEditando || !nuevoEstado) return;
+
+    try {
+      console.log(`🔄 Cambiando estado del pago ${pagoEditando.id} a ${nuevoEstado}`);
+      
+      const result = await paymentsService.cambiarEstado(pagoEditando.id, nuevoEstado);
+      
+      if (result.success) {
+        console.log('✅ Estado actualizado exitosamente');
+        // Actualizar el estado local
+        setPagos(prevPagos => 
+          prevPagos.map(pago => 
+            pago.id === pagoEditando.id 
+              ? { ...pago, estado_pago: nuevoEstado } 
+              : pago
+          )
+        );
+        cerrarModalEdicion();
+      } else {
+        console.error('❌ Error:', result.error);
+        alert(`Error al actualizar estado: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('❌ Error inesperado:', error);
+      alert('Error al actualizar el estado del pago');
+    }
   };
 
   // Array de colores para las categorías
@@ -582,6 +627,7 @@ export default function AdminVentas() {
                 <option value="todos">Todos</option>
                 <option value="aprobado">Aprobado</option>
                 <option value="pendiente">Pendiente</option>
+                <option value="cancelado">Cancelado</option>
               </select>
             </div>
           </div>
@@ -732,6 +778,9 @@ export default function AdminVentas() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Método
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Acciones
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -764,11 +813,20 @@ export default function AdminVentas() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                         {pago.metodo_pago || 'MercadoPago'}
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <button
+                          onClick={() => abrirModalEdicion(pago)}
+                          className="text-indigo-600 hover:text-indigo-900 font-medium"
+                        >
+                          <i className="fas fa-edit mr-1"></i>
+                          Editar
+                        </button>
+                      </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="7" className="px-6 py-8 text-center">
+                    <td colSpan="8" className="px-6 py-8 text-center">
                       <div className="text-gray-500">
                         <i className="fas fa-inbox text-4xl mb-2"></i>
                         <p className="text-sm">No se encontraron pagos con los filtros aplicados</p>
@@ -781,6 +839,55 @@ export default function AdminVentas() {
           </div>
         </div>
       </main>
+
+      {/* Modal de Edición */}
+      {pagoEditando && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Editar Estado del Pago #{pagoEditando.id}
+            </h3>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Estado Actual: <span className={`px-2 py-1 rounded text-xs font-semibold ${getEstadoBadge(pagoEditando.estado_pago)}`}>
+                  {getEstadoTexto(pagoEditando.estado_pago)}
+                </span>
+              </label>
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Nuevo Estado
+              </label>
+              <select
+                value={nuevoEstado}
+                onChange={(e) => setNuevoEstado(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              >
+                <option value="aprobado">Aprobado</option>
+                <option value="pendiente">Pendiente</option>
+                <option value="cancelado">Cancelado</option>
+              </select>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={cambiarEstadoPago}
+                className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 font-medium"
+              >
+                Guardar
+              </button>
+              <button
+                onClick={cerrarModalEdicion}
+                className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 font-medium"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { motion } from 'framer-motion';
 
 export default function AdminLogin() {
   const navigate = useNavigate();
-  const { loginAdmin } = useAuth();
+  const { loginAdmin, isAuthenticated, isAdmin, loading: authLoading } = useAuth();
   
   const [formData, setFormData] = useState({
     email: '',
@@ -15,6 +15,14 @@ export default function AdminLogin() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  // Verificar si ya está logueado y redirigir
+  useEffect(() => {
+    if (!authLoading && isAuthenticated && isAdmin) {
+      // Admin ya logueado, redirigir al dashboard
+      navigate('/admin/dashboard', { replace: true });
+    }
+  }, [authLoading, isAuthenticated, isAdmin, navigate]);
 
   const handleChange = (e) => {
     setFormData({
@@ -42,7 +50,7 @@ export default function AdminLogin() {
       
       if (result.success) {
         // Login exitoso, redirigir al dashboard
-        navigate('/admin/dashboard');
+        navigate('/admin/dashboard', { replace: true });
       } else {
         setError(result.message || 'Error al iniciar sesión');
       }
@@ -52,6 +60,18 @@ export default function AdminLogin() {
       setLoading(false);
     }
   };
+
+  // Mostrar loading mientras se verifica la autenticación
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <i className="fas fa-spinner fa-spin text-4xl text-indigo-600 mb-4"></i>
+          <p className="text-gray-600">Verificando sesión...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex">
