@@ -75,7 +75,8 @@ class UsuarioViewSet(viewsets.ModelViewSet):
             return [AllowAny()]
         if self.action in ['me']:
             return [IsAuthenticated()]
-        if self.action in ['retrieve', 'update', 'partial_update']:
+        # ✅ FIX: Agregar 'cambiar_password' a las acciones permitidas para usuarios autenticados
+        if self.action in ['retrieve', 'update', 'partial_update', 'cambiar_password']:
             return [IsAuthenticated()]
         return [IsAuthenticated(), IsAdminUser()]
     

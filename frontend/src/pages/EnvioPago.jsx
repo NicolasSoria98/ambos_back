@@ -1,13 +1,27 @@
-/**
- * EnvioPago.jsx - Página de checkout con integración de MercadoPago
- * Ubicación: src/pages/EnvioPago.jsx
- * 
- * REEMPLAZA el contenido actual con este código
- */
+
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import paymentsService from "../services/payments";
 import authService from "../services/auth";
+
+const getAuthToken = () => {
+  // Intentar obtener token de cliente primero
+  const clientToken = authService.getClienteToken();
+  if (clientToken) return clientToken;
+  
+  // Si no hay token de cliente, intentar con admin
+  const adminToken = authService.getAdminToken();
+  if (adminToken) return adminToken;
+  
+  // Fallback: buscar en localStorage con nombres alternativos
+  return (
+    localStorage.getItem("client_authToken") ||
+    localStorage.getItem("admin_authToken") ||
+    localStorage.getItem("clientAuthToken") ||
+    localStorage.getItem("authToken") ||
+    null
+  );
+};
 
 export default function EnvioPago() {
   const navigate = useNavigate();
@@ -22,9 +36,9 @@ export default function EnvioPago() {
     notas: "",
   });
   const [metodoEnvio, setMetodoEnvio] = useState("envio");
-  const [metodoPago, setMetodoPago] = useState("mercadopago"); // Nuevo estado
-  const [loading, setLoading] = useState(false); // Estado de carga
-  const [error, setError] = useState(null); // Estado de error
+  const [metodoPago, setMetodoPago] = useState("mercadopago");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     try {
@@ -85,11 +99,8 @@ export default function EnvioPago() {
         console.warn("No se pudo obtener perfil (authService):", error);
       }
 
-      const token =
-        (typeof authService.getClienteToken === "function" && authService.getClienteToken()) ||
-        localStorage.getItem("client_authToken") ||
-        localStorage.getItem("clientAuthToken") ||
-        localStorage.getItem("authToken");
+      // ✅ FIX: Usar getAuthToken()
+      const token = getAuthToken();
       if (!token) return;
       try {
         const res = await fetch(`${import.meta.env.VITE_API_URL}/auth/me/`, {
@@ -143,8 +154,8 @@ export default function EnvioPago() {
 
     try {
       setLoading(true);
-      const rawToken = localStorage.getItem("authToken");
-      const token = rawToken && rawToken !== "undefined" && rawToken !== "null" ? rawToken : null;
+      // ✅ FIX: Usar getAuthToken()
+      const token = getAuthToken();
 
       const pedido = {
         id: Date.now(),
@@ -211,7 +222,7 @@ export default function EnvioPago() {
             const err = await res.json(); 
             msg = err.detail || JSON.stringify(err); 
           } catch { 
-            throw new Error("ff");
+            throw new Error("Error al procesar respuesta del servidor");
           }
           alert(msg);
           setLoading(false);
@@ -231,8 +242,7 @@ export default function EnvioPago() {
         const next = [storedOrder, ...Array.isArray(list) ? list : []];
         localStorage.setItem("orders_local", JSON.stringify(next));
       } catch { 
-        throw new Error("ff");
-        
+        console.error("Error al guardar orden local");
       }
       
       localStorage.removeItem("cart");
@@ -252,8 +262,8 @@ export default function EnvioPago() {
       setLoading(true);
       setError(null);
 
-      const rawToken = localStorage.getItem("authToken");
-      const token = rawToken && rawToken !== "undefined" && rawToken !== "null" ? rawToken : null;
+      // ✅ FIX: Usar getAuthToken()
+      const token = getAuthToken();
 
       if (!token) {
         alert("Inicia sesión para finalizar la compra");
@@ -301,8 +311,7 @@ export default function EnvioPago() {
           const err = await resPedido.json();
           msg = err.detail || JSON.stringify(err);
         } catch { 
-          throw new Error("XD");
-          
+          throw new Error("Error al procesar respuesta del servidor");
         }
         throw new Error(msg);
       }
@@ -326,7 +335,7 @@ export default function EnvioPago() {
         },
         frontend_url: import.meta.env.DEV 
                 ? "http://127.0.0.1:5173"
-                : window.location.origin, // URL base del frontend
+                : window.location.origin,
       };
 
       console.log("💳 Creando preferencia de pago...", preferenceData);
@@ -347,7 +356,6 @@ export default function EnvioPago() {
       localStorage.removeItem("cart");
 
       // 5. Redirigir a MercadoPago
-      // En producción usar init_point, en desarrollo usar sandbox_init_point
       const checkoutUrl = result.data.init_point || result.data.sandbox_init_point;
 
       if (!checkoutUrl) {

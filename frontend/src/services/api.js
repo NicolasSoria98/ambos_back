@@ -22,18 +22,15 @@ api.interceptors.request.use(
     const adminToken = localStorage.getItem('admin_authToken');
     const clientToken = localStorage.getItem('client_authToken');
     
-    // Lógica mejorada para seleccionar el token correcto:
-    // 1. Si la URL o ruta es de admin, usar token de admin
-    // 2. Si estamos en área de cliente Y solo hay token de cliente, usar token de cliente
-    // 3. Si estamos en área de cliente pero solo hay token de admin, NO enviar token
+    // ✅ FIX: Lógica mejorada para seleccionar el token correcto
     let token = null;
     
     if (isAdminUrl || isAdminPath) {
       // Área de admin - usar token de admin si existe
       token = adminToken;
     } else {
-      // Área de cliente - SOLO usar token de cliente, ignorar token de admin
-      token = clientToken;
+      // Área de cliente - priorizar token de cliente, pero permitir admin si no hay cliente
+      token = clientToken || adminToken;
     }
     
     if (token) {

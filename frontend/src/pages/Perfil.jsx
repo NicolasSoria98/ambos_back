@@ -4,13 +4,20 @@ import { User, Lock, Package } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import authService from "../services/auth";
 
-const getClientToken = () => {
-  if (typeof authService.getClienteToken === "function") {
-    const token = authService.getClienteToken();
-    if (token) return token;
-  }
+// ✅ FIX: Función que obtiene el token correcto según el contexto
+const getAuthToken = () => {
+  // Intentar obtener token de cliente primero
+  const clientToken = authService.getClienteToken();
+  if (clientToken) return clientToken;
+  
+  // Si no hay token de cliente, intentar con admin
+  const adminToken = authService.getAdminToken();
+  if (adminToken) return adminToken;
+  
+  // Fallback: buscar en localStorage con nombres alternativos
   return (
     localStorage.getItem("client_authToken") ||
+    localStorage.getItem("admin_authToken") ||
     localStorage.getItem("clientAuthToken") ||
     localStorage.getItem("authToken") ||
     null
@@ -65,7 +72,7 @@ export default function Perfil() {
   useEffect(() => {
     const cargarPedidos = async () => {
       try {
-        const token = getClientToken();
+        const token = getAuthToken(); // ✅ FIX: Usar getAuthToken
         if (!token) throw new Error("Sin token");
         const response = await fetch(`${import.meta.env.VITE_API_URL}/pedidos/pedido/`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -111,9 +118,9 @@ export default function Perfil() {
     e.preventDefault();
 
     try {
-      const token = getClientToken();
+      const token = getAuthToken(); // ✅ FIX: Usar getAuthToken
       if (!token) {
-        alert("Tu sesi��n expir��. Inici�� nuevamente.");
+        alert("Tu sesión expiró. Iniciá nuevamente.");
         logout();
         return;
       }
@@ -170,9 +177,9 @@ export default function Perfil() {
     }
 
     try {
-      const token = getClientToken();
+      const token = getAuthToken(); // ✅ FIX: Usar getAuthToken
       if (!token) {
-        alert("Tu sesi��n expir��. Inici�� nuevamente.");
+        alert("Tu sesión expiró. Iniciá nuevamente.");
         logout();
         return;
       }

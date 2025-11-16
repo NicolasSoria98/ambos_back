@@ -15,20 +15,56 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
 
-  // Determinar si estamos en área de admin basado en la ruta ACTUAL
-  const isAdminArea = window.location.pathname.startsWith('/admin');
+  // ✅ FIX: Calcular isAdminArea dinámicamente desde currentPath
+  const isAdminArea = currentPath.startsWith('/admin');
 
   // Calcular isAdmin basado en el user actual
   const isAdmin = user?.tipo_usuario === 'administrador' || user?.is_staff === true;
 
-  // Cargar usuario al iniciar - SOLO UNA VEZ al montar
+  // ✅ FIX: Listener para detectar cambios de ruta
+  useEffect(() => {
+    // Función que actualiza el path actual
+    const handleLocationChange = () => {
+      const newPath = window.location.pathname;
+      if (newPath !== currentPath) {
+        setCurrentPath(newPath);
+      }
+    };
+
+    // Escuchar navegación del navegador (botones adelante/atrás)
+    window.addEventListener('popstate', handleLocationChange);
+    
+    // Escuchar cambios de ruta (para React Router)
+    const originalPushState = window.history.pushState;
+    const originalReplaceState = window.history.replaceState;
+
+    window.history.pushState = function(...args) {
+      originalPushState.apply(window.history, args);
+      handleLocationChange();
+    };
+
+    window.history.replaceState = function(...args) {
+      originalReplaceState.apply(window.history, args);
+      handleLocationChange();
+    };
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('popstate', handleLocationChange);
+      window.history.pushState = originalPushState;
+      window.history.replaceState = originalReplaceState;
+    };
+  }, [currentPath]);
+
+  // ✅ FIX: Recargar autenticación cuando cambia currentPath
   useEffect(() => {
     checkAuth();
-  }, []); // Sin dependencias para evitar re-renders infinitos
+  }, [currentPath]);
 
   const checkAuth = async () => {
-    const adminArea = window.location.pathname.startsWith('/admin');
+    const adminArea = currentPath.startsWith('/admin');
     
     if (adminArea) {
       // Área de admin - cargar sesión de admin
@@ -176,7 +212,7 @@ export const AuthProvider = ({ children }) => {
     logoutCliente,
     updateProfile,
     refreshUser,
-    checkAuth, // Exportar para poder refrescar manualmente si es necesario
+    checkAuth,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
