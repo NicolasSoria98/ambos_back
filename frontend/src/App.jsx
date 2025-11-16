@@ -11,12 +11,10 @@ import Producto from "./pages/Producto.jsx";
 import Carrito from "./pages/Carrito.jsx";
 import EnvioPago from "./pages/EnvioPago.jsx";
 import CompraExitosa from "./pages/CompraExitosa.jsx";
-import PagoFallido from "./pages/PagoFallido.jsx";        // ✨ AGREGAR ESTA LÍNEA
-import PagoPendiente from "./pages/PagoPendiente.jsx";    // ✨ AGREGAR ESTA LÍNEA
+import PagoFallido from "./pages/PagoFallido.jsx";        
+import PagoPendiente from "./pages/PagoPendiente.jsx";   
 import Contacto from "./pages/Contacto.jsx";
 import Perfil from "./pages/Perfil.jsx";
-
-// Páginas del Panel Admin
 import AdminLogin from "./pages/admin/AdminLogin.jsx";
 import AdminDashboard from "./pages/admin/Admin.jsx";
 import AdminVentas from "./pages/admin/AdminVentas.jsx";
@@ -27,10 +25,7 @@ import AdminUsuarios from "./pages/Admin/AdminUsuarios.jsx";
 
 function Layout() {
   const location = useLocation();
-  const isRegistro = location.pathname === "/registro";
   const isAdmin = location.pathname.startsWith("/admin");
-
-  // Layout específico para panel admin (sin navbar ni footer)
   if (isAdmin) {
     return (
       <Routes>
@@ -87,9 +82,9 @@ function Layout() {
   }
 
   return (
-    <div className={`flex flex-col min-h-screen ${isRegistro ? "h-screen overflow-hidden" : ""}`}>
+    <div className={`flex flex-col min-h-screen`}>
       <Navbar />
-      <main className={`flex-grow pt-12 md:pt-16 ${isRegistro ? "p-0 md:pt-0 md:pb-0" : ""}`}>
+      <main className={`flex-grow`}>
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/registro" element={<Registro />} />
@@ -98,11 +93,9 @@ function Layout() {
           <Route path="/carrito" element={<Carrito />} />
           <Route path="/enviopago" element={<EnvioPago />} />
           <Route path="/compra-exitosa" element={<CompraExitosa />} />
-          <Route path="/pago-fallido" element={<PagoFallido />} />          {/* ✨ AGREGAR ESTA LÍNEA */}
-          <Route path="/pago-pendiente" element={<PagoPendiente />} />      {/* ✨ AGREGAR ESTA LÍNEA */}
+          <Route path="/pago-fallido" element={<PagoFallido />} />  
+          <Route path="/pago-pendiente" element={<PagoPendiente />} />   
           <Route path="/contacto" element={<Contacto />} />
-          
-          {/* Perfil - ruta protegida para clientes */}
           <Route
             path="/perfil"
             element={
@@ -113,7 +106,7 @@ function Layout() {
           />
         </Routes>
       </main>
-      <Footer fixed={isRegistro} />
+      <Footer/>
     </div>
   );
 }

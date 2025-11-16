@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext";
 
 export default function Registro() {
   const navigate = useNavigate();
-  const { loginCliente, register, isAuthenticated, user, isAdmin } = useAuth(); // ⬅️ Agregar user e isAdmin
+  const { loginCliente, register, isAuthenticated, user, isAdmin } = useAuth(); 
   const [modo, setModo] = useState("login");
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -18,18 +18,15 @@ export default function Registro() {
   });
 
   useEffect(() => {
-    // Solo redirigir si es cliente autenticado, NO si es admin
-    if (isAuthenticated && user && !isAdmin) { // ⬅️ CAMBIO AQUÍ
+    if (isAuthenticated && user && !isAdmin) { 
       navigate("/perfil");
     }
-  }, [isAuthenticated, user, isAdmin, navigate]); // ⬅️ AGREGAR DEPENDENCIAS
+  }, [isAuthenticated, user, isAdmin, navigate]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     
-    // Validación especial para el campo de teléfono
     if (name === "telefono") {
-      // Solo permitir números y máximo 8 dígitos
       const numericValue = value.replace(/\D/g, '').slice(0, 10);
       setFormData((prev) => ({ ...prev, [name]: numericValue }));
       return;
@@ -37,7 +34,6 @@ export default function Registro() {
     
     setFormData((prev) => ({ ...prev, [name]: value }));
     
-    // Auto-generar username desde el email
     if (name === "email") {
       const username = value.split('@')[0];
       setFormData((prev) => ({ ...prev, username }));
@@ -50,7 +46,6 @@ export default function Registro() {
 
     try {
       if (modo === "login") {
-        // LOGIN
         const result = await loginCliente(formData.email, formData.password);
         
         if (result.success) {
@@ -59,14 +54,12 @@ export default function Registro() {
           alert(result.message || "Credenciales incorrectas");
         }
       } else {
-        // REGISTRO
         if (formData.password !== formData.password_confirm) {
           alert("Las contraseñas no coinciden");
           setLoading(false);
           return;
         }
 
-        // Validar que el teléfono tenga exactamente 8 dígitos
         if (formData.telefono.length !== 10) {
           alert("El teléfono debe tener exactamente 8 dígitos");
           setLoading(false);
@@ -98,8 +91,8 @@ export default function Registro() {
   };
 
   return (
-    <div className="h-full min-h-[calc(100vh-6rem)] md:min-h-[calc(100vh-8rem)] flex flex-col md:flex-row">
-      <div className="md:w-1/2 flex flex-col justify-center items-center bg-[#2F4858] text-white text-center py-12">
+    <div className="h-screen md:h-[calc(100vh-6rem)] flex flex-col md:flex-row z-0">
+      <div className="md:w-1/2 flex flex-col justify-center items-center bg-[#084B83] text-white text-center py-12 mt-16">
         <div>
           <h1 className="text-2xl md:text-3xl">Bienvenido/a a</h1>
           <h1 className="text-4xl md:text-5xl font-semibold">Ambos Norte</h1>
@@ -136,7 +129,7 @@ export default function Registro() {
                 <input
                   type="tel"
                   name="telefono"
-                  placeholder="Número de teléfono (10 dígitos)"
+                  placeholder="Número de teléfono"
                   value={formData.telefono}
                   onChange={handleChange}
                   required
