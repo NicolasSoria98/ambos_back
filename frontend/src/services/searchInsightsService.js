@@ -1,6 +1,6 @@
 import api from './api';
 
-const BASE_URL = '/api/search-insights';
+const BASE_URL = '/search-insights';
 
 const searchInsightsService = {
   // Consultar tendencias de búsqueda
