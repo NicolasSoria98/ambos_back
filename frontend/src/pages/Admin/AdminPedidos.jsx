@@ -94,26 +94,6 @@ export default function AdminPedidos() {
     }
   };
 
-  const handleToggleActivo = async (pedido) => {
-    if (pedido.activo) {
-      // Si está activo, se va a desactivar y cancelar
-      if (!window.confirm('¿Estás seguro de cancelar y desactivar este pedido?')) return;
-    }
-
-    try {
-      const response = await ordersService.toggleActivo(pedido.id);
-      if (pedido.activo) {
-        alert('Pedido cancelado y desactivado correctamente');
-      } else {
-        alert('Pedido reactivado correctamente');
-      }
-      cargarPedidos();
-    } catch (err) {
-      alert('Error al cambiar estado del pedido: ' + err.message);
-      console.error(err);
-    }
-  };
-
   const getEstadoColor = (estado) => {
     const estadoObj = estados.find(e => e.value === estado);
     return estadoObj ? estadoObj.color : 'gray';
@@ -209,7 +189,7 @@ export default function AdminPedidos() {
               </select>
             </div>
 
-            {/* Resumen rápido - ACTUALIZADO */}
+            {/* Resumen rápido */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
               <div className="bg-gray-50 p-4 rounded-lg">
                 <p className="text-sm text-gray-600">Total Pedidos</p>
@@ -280,17 +260,13 @@ export default function AdminPedidos() {
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <button
-                          onClick={() => handleToggleActivo(pedido)}
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer transition ${
-                            pedido.activo 
-                              ? 'bg-green-100 text-green-800 hover:bg-green-200' 
-                              : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                          }`}
-                          title={`Click para ${pedido.activo ? 'desactivar' : 'activar'}`}
-                        >
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          pedido.activo 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
                           {pedido.activo ? 'Activo' : 'Inactivo'}
-                        </button>
+                        </span>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex gap-2">
@@ -412,8 +388,8 @@ export default function AdminPedidos() {
                   <h3 className="font-semibold text-lg mb-3">Productos</h3>
                   <div className="space-y-3">
                     {selectedPedido.items && selectedPedido.items.map((item, index) => (
-                      <div key={index} className="flex justify-between items-center bg-gray-50 p-3 rounded">
-                        <div className="flex items-center gap-3">
+                      <div key={index} className="flex justify-between items-start bg-gray-50 p-3 rounded">
+                        <div className="flex items-start gap-3 flex-1">
                           {item.producto_info?.imagen_principal && (
                             <img
                               src={item.producto_info.imagen_principal}
@@ -421,14 +397,26 @@ export default function AdminPedidos() {
                               className="w-16 h-16 object-cover rounded"
                             />
                           )}
-                          <div>
+                          <div className="flex-1">
                             <p className="font-medium">{item.nombre_producto}</p>
-                            <p className="text-sm text-gray-600">
+                            <div className="flex flex-wrap gap-2 mt-1">
+                              {item.variante_info?.talla_nombre && (
+                                <span className="text-xs px-2 py-0.5 bg-gray-200 rounded-md font-medium text-gray-700">
+                                  Talla: {item.variante_info.talla_nombre}
+                                </span>
+                              )}
+                              {item.variante_info?.color_nombre && (
+                                <span className="text-xs px-2 py-0.5 bg-gray-200 rounded-md font-medium text-gray-700">
+                                  Color: {item.variante_info.color_nombre}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-600 mt-1">
                               Cantidad: {item.cantidad} x ${parseFloat(item.precio_unitario).toFixed(2)}
                             </p>
                           </div>
                         </div>
-                        <p className="font-semibold">${parseFloat(item.subtotal).toFixed(2)}</p>
+                        <p className="font-semibold ml-4">${parseFloat(item.subtotal).toFixed(2)}</p>
                       </div>
                     ))}
                   </div>
@@ -462,7 +450,10 @@ export default function AdminPedidos() {
               <div className="mt-6 flex gap-4">
                 {selectedPedido.activo && (
                   <button
-                    onClick={() => handleCambiarEstado(selectedPedido)}
+                    onClick={() => {
+                      setShowModal(false);
+                      handleCambiarEstado(selectedPedido);
+                    }}
                     className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg transition"
                   >
                     Cambiar Estado

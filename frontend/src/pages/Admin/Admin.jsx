@@ -117,9 +117,6 @@ export default function AdminDashboard() {
       console.log('📦 Pedidos de ayer:', cantidadPedidosAyer);
       console.log('📦 Cambio:', cambioPedidos.toFixed(2) + '%');
       
-      // Obtener resumen de métricas para usuarios
-      const resumenData = await analyticsService.getResumenMetricas();
-      
       // ========== TOP 5 PRODUCTOS MÁS VENDIDOS ==========
       const productosVendidosData = await analyticsService.getTopProductosVendidos(5);
       setTopProductos(productosVendidosData);
@@ -177,10 +174,6 @@ export default function AdminDashboard() {
         pedidos: {
           hoy: cantidadPedidosHoy,
           cambio: cambioPedidos,
-        },
-        usuarios: {
-          hoy: resumenData.usuarios_activos_hoy || 0,
-          cambio: resumenData.cambio_usuarios || 0,
         },
         ticket: {
           hoy: ticketPromedioMes,
@@ -431,7 +424,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* KPIs */}
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 mb-8">
           <KPICard
             title="Ventas Hoy"
             value={`$${kpis.ventas?.hoy?.toLocaleString() || 0}`}
@@ -445,13 +438,6 @@ export default function AdminDashboard() {
             change={kpis.pedidos?.cambio}
             icon="fas fa-shopping-cart"
             color="green"
-          />
-          <KPICard
-            title="Usuarios Activos"
-            value={kpis.usuarios?.hoy || 0}
-            change={kpis.usuarios?.cambio}
-            icon="fas fa-users"
-            color="yellow"
           />
           <KPICard
             title="Ticket Promedio (Mes)"
