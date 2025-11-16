@@ -6,7 +6,7 @@ require('dotenv').config();
 const app = express();
 
 app.use(cors({
-  origin: 'http://localhost:3000'
+  origin: ['http://localhost:3000', 'http://localhost:5173']
 }));
 app.use(express.json());
 
@@ -28,24 +28,47 @@ app.post('/process-payment', async (req, res) => {
       metadata
     } = req.body;
 
+    console.log('📥 Datos recibidos:', req.body);
+
     const payment = new Payment(client);
 
-    const result = await payment.create({
-      body: {
-        transaction_amount: Number(transaction_amount),
-        token,
-        description,
-        installments: Number(installments),
-        payment_method_id,
-        payer: {
-          email: payer.email,
-          identification: {
-            type: payer.identification.type,
-            number: payer.identification.number
-          }
-        },
-        metadata: metadata || {}
+    // 🔥 Preparar el body según el método de pago
+    const paymentBody = {
+      transaction_amount: Number(transaction_amount),
+      description,
+      payment_method_id,
+      payer: {
+        email: payer.email
       }
+    };
+
+    // Solo agregar token si existe (para tarjetas)
+    if (token) {
+      paymentBody.token = token;
+    }
+
+    // Solo agregar installments si existe (para tarjetas)
+    if (installments) {
+      paymentBody.installments = Number(installments);
+    }
+
+    // Solo agregar identification si existe (para tarjetas)
+    if (payer.identification && payer.identification.type) {
+      paymentBody.payer.identification = {
+        type: payer.identification.type,
+        number: payer.identification.number
+      };
+    }
+
+    // Agregar metadata
+    if (metadata) {
+      paymentBody.metadata = metadata;
+    }
+
+    console.log('📤 Enviando a MP:', paymentBody);
+
+    const result = await payment.create({
+      body: paymentBody
     });
 
     console.log('✅ Pago procesado:', result);
@@ -64,7 +87,7 @@ app.post('/process-payment', async (req, res) => {
             transaction_amount: result.transaction_amount,
             payment_method_id: result.payment_method_id,
             payer_email: payer.email,
-            installments: installments
+            installments: installments || 1
           })
         });
 

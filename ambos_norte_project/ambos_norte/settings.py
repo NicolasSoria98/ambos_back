@@ -14,10 +14,12 @@ import sys
 from pathlib import Path
 from decouple import config
 #import mercadopago
+"""
 import pymysql
 
 pymysql.install_as_MySQLdb()
 
+"""
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -48,7 +50,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     #'mercadopago',
-    'pymysql',
+    #'pymysql',
     #apps locales
     'apps.usuarios',
     'apps.catalogo',
