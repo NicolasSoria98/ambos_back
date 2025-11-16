@@ -42,6 +42,7 @@ class ImagenProductoSerializer(serializers.ModelSerializer):
 class ProductoVarianteSerializer(serializers.ModelSerializer):
     talla_nombre = serializers.CharField(source='talla.nombre', read_only=True)
     color_nombre = serializers.CharField(source='color.nombre', read_only=True)
+    color_codigo_hex = serializers.CharField(source='color.codigo_hex', read_only=True)
     precio_final = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     imagenes = ImagenProductoSerializer(many=True, read_only=True)
     
@@ -53,6 +54,7 @@ class ProductoVarianteSerializer(serializers.ModelSerializer):
             "talla_nombre",
             "color",
             "color_nombre",
+            "color_codigo_hex",
             "stock",
             "precio_final",
             "activo",
@@ -283,21 +285,34 @@ class ProductoCreateUpdateSerializer(serializers.ModelSerializer):
         instance.save()
         
         if variantes_data is not None:
-            instance.variantes.all().delete()
+            existentes = {
+                (variante.talla_id, variante.color_id): variante
+                for variante in instance.variantes.all()
+            }
+            procesados = set()
             
             for variante_data in variantes_data:
                 imagenes_data = variante_data.pop('imagenes', [])
                 talla_id = variante_data.pop('talla')
                 color_id = variante_data.pop('color')
-                talla = Talla.objects.get(id=talla_id)
-                color = Color.objects.get(id=color_id)
+                key = (talla_id, color_id)
                 
-                variante = ProductoVariante.objects.create(
-                    producto=instance,
-                    talla=talla,
-                    color=color,
-                    **variante_data
-                )
+                if key in existentes:
+                    variante = existentes[key]
+                    for attr, value in variante_data.items():
+                        setattr(variante, attr, value)
+                    variante.save()
+                else:
+                    talla = Talla.objects.get(id=talla_id)
+                    color = Color.objects.get(id=color_id)
+                    variante = ProductoVariante.objects.create(
+                        producto=instance,
+                        talla=talla,
+                        color=color,
+                        **variante_data
+                    )
+                
+                procesados.add(variante.pk)
                 
                 for imagen_data in imagenes_data:
                     if isinstance(imagen_data, dict) and 'id' in imagen_data:
@@ -307,6 +322,9 @@ class ProductoCreateUpdateSerializer(serializers.ModelSerializer):
                             imagen.save()
                         except ImagenProducto.DoesNotExist:
                             pass
+            
+            # Eliminar variantes que ya no se enviaron en la actualizaci��n
+            instance.variantes.exclude(pk__in=procesados).delete()
         
         return instance
 

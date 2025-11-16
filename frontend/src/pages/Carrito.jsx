@@ -96,7 +96,17 @@ export default function Carrito() {
                       alt={item.nombre} 
                       className="w-8 h-8 md:w-16 md:h-16 rounded-md object-cover" 
                     />
-                    <span className="font-medium break-words break-all md:break-normal">{item.nombre}</span>
+                    <div className="flex flex-col">
+                      <span className="font-medium break-words break-all md:break-normal">
+                        {item.nombre}
+                      </span>
+                      {(item.color || item.talla) && (
+                        <div className="text-xs text-gray-500 flex flex-col md:flex-row md:gap-3">
+                          {item.color ? <span>Color: {item.color}</span> : null}
+                          {item.talla ? <span>Talle: {item.talla}</span> : null}
+                        </div>
+                      )}
+                    </div>
                   </td>
                   <td>
                     <div className="flex items-center gap-2">
