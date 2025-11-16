@@ -13,10 +13,11 @@ import os
 import sys
 from pathlib import Path
 from decouple import config
-import mercadopago
+#import mercadopago
+import pymysql
 
-MERCADO_PAGO_ACCESS_TOKEN=config('MERCADO_PAGO_ACCESS_TOKEN')
-sdk = mercadopago.SDK(MERCADO_PAGO_ACCESS_TOKEN)
+pymysql.install_as_MySQLdb()
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -46,7 +47,8 @@ INSTALLED_APPS = [
     'corsheaders',
     'rest_framework',
     'rest_framework_simplejwt',
-    'mercadopago',
+    #'mercadopago',
+    'pymysql',
     #apps locales
     'apps.usuarios',
     'apps.catalogo',
