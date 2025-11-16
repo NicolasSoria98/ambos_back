@@ -466,3 +466,92 @@ class PagoViewSet(viewsets.ModelViewSet):
             print(traceback.format_exc())
             # Devolver 200 para que MP no reintente la notificación
             return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_200_OK)
+    @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated, IsAdminUser])
+    def cambiar_estado(self, request, pk=None):
+        """
+        Permite al admin cambiar manualmente el estado de un pago
+        
+        PATCH /api/pagos/pago/{id}/cambiar_estado/
+        
+        Body:
+        {
+            "estado": "aprobado" | "pendiente" | "rechazado" | "cancelado"
+        }
+        """
+        try:
+            pago = self.get_object()
+            nuevo_estado = request.data.get('estado')
+            
+            # Validar que el estado sea válido
+            estados_validos = ['aprobado', 'pendiente', 'rechazado', 'cancelado', 'devuelto', 'en_proceso']
+            
+            if not nuevo_estado:
+                return Response({
+                    'success': False,
+                    'error': 'El campo estado es requerido'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            if nuevo_estado not in estados_validos:
+                return Response({
+                    'success': False,
+                    'error': f'Estado inválido. Opciones válidas: {", ".join(estados_validos)}'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Guardar estado anterior
+            estado_anterior = pago.estado_pago
+            
+            # Actualizar estado
+            pago.estado_pago = nuevo_estado
+            
+            # Si se aprueba manualmente, registrar fecha de pago
+            if nuevo_estado == 'aprobado' and not pago.fecha_pago:
+                pago.fecha_pago = datetime.now()
+            
+            pago.save()
+            
+            print(f"✅ Estado de pago #{pago.id} cambiado: {estado_anterior} -> {nuevo_estado} (por admin)")
+            
+            # Actualizar estado del pedido si es necesario
+            if pago.pedido:
+                pedido = pago.pedido
+                
+                if nuevo_estado == 'aprobado' and pedido.estado == 'pendiente':
+                    pedido.estado = 'en_preparacion'
+                    pedido.save()
+                    
+                    HistorialEstadoPedido.objects.create(
+                        pedido=pedido,
+                        estado_anterior='pendiente',
+                        estado_nuevo='en_preparacion',
+                        comentario=f'Pago aprobado manualmente por admin - Pago ID: {pago.id}'
+                    )
+                    print(f"✅ Pedido #{pedido.id} actualizado a 'en_preparacion'")
+                
+                elif nuevo_estado in ['rechazado', 'cancelado']:
+                    if pedido.estado != 'cancelado':
+                        pedido.estado = 'cancelado'
+                        pedido.activo = False
+                        pedido.save()
+                        
+                        HistorialEstadoPedido.objects.create(
+                            pedido=pedido,
+                            estado_anterior=estado_anterior,
+                            estado_nuevo='cancelado',
+                            comentario=f'Pago {nuevo_estado} manualmente por admin - Pago ID: {pago.id}'
+                        )
+                        print(f"❌ Pedido #{pedido.id} cancelado")
+            
+            serializer = self.get_serializer(pago)
+            return Response({
+                'success': True,
+                'message': f'Estado actualizado de {estado_anterior} a {nuevo_estado}',
+                'pago': serializer.data
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            print(f"❌ Error cambiando estado de pago: {str(e)}")
+            print(traceback.format_exc())
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
