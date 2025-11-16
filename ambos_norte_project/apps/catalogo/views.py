@@ -103,6 +103,11 @@ class ProductoViewSet(viewsets.ModelViewSet):
         if categoria:
             queryset = queryset.filter(categoria_id=categoria)
         
+        # Filtro por sexo
+        sexo = self.request.query_params.get('sexo', None)
+        if sexo and sexo in ['M', 'F']:
+            queryset = queryset.filter(sexo=sexo)
+        
         # Filtro por búsqueda en nombre
         search = self.request.query_params.get('search', None)
         if search:

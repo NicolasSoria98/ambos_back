@@ -55,6 +55,11 @@ class Color(models.Model):
 
 
 class Producto(models.Model):
+    SEXO_CHOICES = [
+        ('M', 'Masculino'),
+        ('F', 'Femenino'),
+    ]
+    
     categoria = models.ForeignKey(
         Categoria,
         on_delete=models.PROTECT,
@@ -63,6 +68,7 @@ class Producto(models.Model):
     nombre = models.CharField(max_length=255)
     descripcion = models.TextField(blank=True, null=True)
     precio_base = models.DecimalField(max_digits=10, decimal_places=2, help_text="Precio base del producto")
+    sexo = models.CharField(max_length=1, choices=SEXO_CHOICES, blank=True, null=True, help_text="Sexo del producto (M: Masculino, F: Femenino)")
     material = models.CharField(max_length=100, blank=True, null=True)
     imagen_principal = models.ImageField(upload_to='productos/', blank=True, null=True)
     activo = models.BooleanField(default=True)

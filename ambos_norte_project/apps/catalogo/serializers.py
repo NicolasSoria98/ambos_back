@@ -66,11 +66,12 @@ class ProductoListSerializer(serializers.ModelSerializer):
     """Serializer para listar productos - vista resumida"""
     categoria_nombre = serializers.CharField(source='categoria.nombre', read_only=True)
     imagen_principal_url = serializers.SerializerMethodField()
-    stock_total = serializers.SerializerMethodField()  # ✨ CAMBIADO a SerializerMethodField
-    stock = serializers.SerializerMethodField()  # ✨ CAMBIADO a SerializerMethodField
-    stock_disponible = serializers.SerializerMethodField()  # ✨ CAMBIADO a SerializerMethodField
+    stock_total = serializers.SerializerMethodField()
+    stock = serializers.SerializerMethodField()
+    stock_disponible = serializers.SerializerMethodField()
     variantes_count = serializers.SerializerMethodField()
     precio = serializers.DecimalField(source='precio_base', max_digits=10, decimal_places=2, read_only=True)
+    sexo_display = serializers.CharField(source='get_sexo_display', read_only=True)
 
     class Meta:
         model = Producto
@@ -79,6 +80,8 @@ class ProductoListSerializer(serializers.ModelSerializer):
             "nombre",
             "precio_base",
             "precio",
+            "sexo",
+            "sexo_display",
             "stock_total",
             "stock",
             "stock_disponible",
@@ -123,10 +126,11 @@ class ProductoDetailSerializer(serializers.ModelSerializer):
     imagen_principal_url = serializers.SerializerMethodField()
     imagenes = serializers.SerializerMethodField()
     variantes = ProductoVarianteSerializer(many=True, read_only=True)
-    stock_total = serializers.SerializerMethodField()  # ✨ CAMBIADO
-    stock = serializers.SerializerMethodField()  # ✨ CAMBIADO
-    stock_disponible = serializers.SerializerMethodField()  # ✨ CAMBIADO
+    stock_total = serializers.SerializerMethodField()
+    stock = serializers.SerializerMethodField()
+    stock_disponible = serializers.SerializerMethodField()
     precio = serializers.DecimalField(source='precio_base', max_digits=10, decimal_places=2, read_only=True)
+    sexo_display = serializers.CharField(source='get_sexo_display', read_only=True)
 
     class Meta:
         model = Producto
@@ -136,6 +140,8 @@ class ProductoDetailSerializer(serializers.ModelSerializer):
             "descripcion",
             "precio_base",
             "precio",
+            "sexo",
+            "sexo_display",
             "stock_total",
             "stock",
             "stock_disponible",
@@ -190,6 +196,7 @@ class ProductoCreateUpdateSerializer(serializers.ModelSerializer):
             "nombre",
             "descripcion",
             "precio_base",
+            "sexo",
             "material",
             "categoria",
             "activo",

@@ -20,6 +20,7 @@ export default function AdminProductos() {
     nombre: '',
     descripcion: '',
     precio_base: '',
+    sexo: '',
     material: '',
     categoria: '',
     activo: true,
@@ -196,6 +197,7 @@ export default function AdminProductos() {
       const dataToSend = {
         nombre: formData.nombre,
         precio_base: formData.precio_base,
+        sexo: formData.sexo || null,
         categoria: formData.categoria,
         activo: formData.activo,
         destacado: formData.destacado,
@@ -320,6 +322,7 @@ export default function AdminProductos() {
         nombre: productoCompleto.nombre,
         descripcion: productoCompleto.descripcion || '',
         precio_base: productoCompleto.precio_base,
+        sexo: productoCompleto.sexo || '',
         material: productoCompleto.material || '',
         categoria: productoCompleto.categoria,
         activo: productoCompleto.activo,
@@ -384,6 +387,7 @@ export default function AdminProductos() {
       nombre: '',
       descripcion: '',
       precio_base: '',
+      sexo: '',
       material: '',
       categoria: '',
       activo: true,
@@ -495,6 +499,7 @@ export default function AdminProductos() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Imagen</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Categoría</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sexo</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Precio</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock Total</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Variantes</th>
@@ -530,6 +535,17 @@ export default function AdminProductos() {
                         </td>
                         <td className="px-6 py-4 text-gray-600">
                           {categoria?.nombre || 'Sin categoría'}
+                        </td>
+                        <td className="px-6 py-4">
+                          {producto.sexo ? (
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              producto.sexo === 'M' ? 'bg-blue-100 text-blue-800' : 'bg-pink-100 text-pink-800'
+                            }`}>
+                              {producto.sexo === 'M' ? '👨 Masculino' : '👩 Femenino'}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 text-sm">-</span>
+                          )}
                         </td>
                         <td className="px-6 py-4 font-medium text-gray-900">
                           ${parseFloat(producto.precio_base).toFixed(2)}
@@ -692,6 +708,25 @@ export default function AdminProductos() {
                         required
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                       />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Sexo
+                      </label>
+                      <select
+                        name="sexo"
+                        value={formData.sexo}
+                        onChange={handleInputChange}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      >
+                        <option value="">Seleccionar sexo</option>
+                        <option value="M">👨 Masculino</option>
+                        <option value="F">👩 Femenino</option>
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Todas las variantes serán del mismo sexo
+                      </p>
                     </div>
 
                     <div>
