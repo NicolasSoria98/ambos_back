@@ -81,10 +81,10 @@ export default function Landing() {
               </h2>
             </div>
             <Link
-              to="/catalogo"
+              to={{ pathname: "/catalogo", search: "?sexo=M" }}
               className="inline-flex items-center gap-2 whitespace-nowrap bg-[#000000] text-[white] text-xs px-4 py-2 rounded-full font-semibold transition group-hover:translate-x-0.5"
             >
-              VER TODO
+              VER
             </Link>
           </div>
         </div>
@@ -99,10 +99,10 @@ export default function Landing() {
               </h2>
             </div>
             <Link
-              to="/catalogo"
+              to={{ pathname: "/catalogo", search: "?sexo=F" }}
               className="inline-flex items-center gap-2 whitespace-nowrap bg-[#000000] text-[white] text-xs px-4 py-2 rounded-full font-semibold transition group-hover:translate-x-0.5"
             >
-              VER TODO
+              VER
             </Link>
           </div>
         </div>

@@ -4,6 +4,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from django.db.models import Count
 from django.core.exceptions import ValidationError
 from .models import Categoria, Producto, ImagenProducto, Talla, Color, ProductoVariante
 from .serializers import (
@@ -49,6 +50,13 @@ class TallaViewSet(viewsets.ModelViewSet):
         queryset = Talla.objects.all()
         if not self.request.user.is_staff:
             queryset = queryset.filter(activo=True)
+        con_stock = self.request.query_params.get('con_stock', '').lower() == 'true'
+        if con_stock:
+            queryset = queryset.filter(
+                variantes__stock__gt=0,
+                variantes__activo=True,
+                variantes__producto__activo=True
+            ).distinct()
         return queryset.order_by('orden', 'nombre')
     
     def get_permissions(self):
@@ -69,6 +77,13 @@ class ColorViewSet(viewsets.ModelViewSet):
         queryset = Color.objects.all()
         if not self.request.user.is_staff:
             queryset = queryset.filter(activo=True)
+        con_stock = self.request.query_params.get('con_stock', '').lower() == 'true'
+        if con_stock:
+            queryset = queryset.filter(
+                variantes__stock__gt=0,
+                variantes__activo=True,
+                variantes__producto__activo=True
+            ).distinct()
         return queryset.order_by('nombre')
     
     def get_permissions(self):
@@ -148,36 +163,56 @@ class ProductoViewSet(viewsets.ModelViewSet):
         GET: Cualquiera puede ver productos
         POST/PUT/DELETE: Solo administradores
         """
-        if self.action in ['list', 'retrieve', 'buscar']:
+        if self.action in ['list', 'retrieve', 'buscar', 'sexos_disponibles']:
             return [AllowAny()]
         return [IsAuthenticated(), IsAdminUser()]
 
     def create(self, request, *args, **kwargs):
         """Override para debugging y mejor manejo de errores"""
         try:
-            print(f"📥 Request data recibido: {request.data}")
-            print(f"📝 Content-Type: {request.content_type}")
-            
+            print(f"[Producto] Request data recibido: {request.data}")
+            print(f"[Producto] Content-Type: {request.content_type}")
+
             serializer = self.get_serializer(data=request.data)
             serializer.is_valid(raise_exception=True)
-            
-            print(f"✅ Datos validados: {serializer.validated_data}")
-            
+
+            print(f"[Producto] Datos validados: {serializer.validated_data}")
+
             self.perform_create(serializer)
             headers = self.get_success_headers(serializer.data)
-            
-            print(f"✅ Producto creado exitosamente")
-            
+
+            print("[Producto] Producto creado exitosamente")
+
             return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
         except Exception as e:
-            print(f"❌ Error en create: {str(e)}")
-            print(f"📋 Request data: {request.data}")
+            print(f"[Producto] Error en create: {str(e)}")
+            print(f"[Producto] Request data: {request.data}")
             import traceback
-            print(f"📋 Traceback: {traceback.format_exc()}")
+            print(f"[Producto] Traceback: {traceback.format_exc()}")
             return Response(
-                {'error': str(e)}, 
+                {'error': str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+    @action(detail=False, methods=['get'], url_path='sexos_disponibles')
+    def sexos_disponibles(self, request):
+        """Retorna los sexos definidos en el modelo y su cantidad en productos activos"""
+        sexos_map = dict(Producto.SEXO_CHOICES)
+        queryset = (
+            Producto.objects.filter(activo=True, sexo__in=sexos_map.keys())
+            .values('sexo')
+            .annotate(total=Count('id'))
+        )
+        disponibles = {item['sexo']: item['total'] for item in queryset}
+        data = [
+            {
+                'codigo': codigo,
+                'nombre': sexos_map[codigo],
+                'total': disponibles.get(codigo, 0),
+            }
+            for codigo, _ in Producto.SEXO_CHOICES
+        ]
+        return Response({'sexos': data})
 
     def update(self, request, *args, **kwargs):
         """Override para debugging y mejor manejo de errores"""

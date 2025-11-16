@@ -541,7 +541,7 @@ export default function AdminProductos() {
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                               producto.sexo === 'M' ? 'bg-blue-100 text-blue-800' : 'bg-pink-100 text-pink-800'
                             }`}>
-                              {producto.sexo === 'M' ? '👨 Masculino' : '👩 Femenino'}
+                              {producto.sexo === 'M' ? 'Masculino' : 'Femenino'}
                             </span>
                           ) : (
                             <span className="text-gray-400 text-sm">-</span>

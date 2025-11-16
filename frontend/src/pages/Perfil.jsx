@@ -4,6 +4,19 @@ import { User, Lock, Package } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import authService from "../services/auth";
 
+const getClientToken = () => {
+  if (typeof authService.getClienteToken === "function") {
+    const token = authService.getClienteToken();
+    if (token) return token;
+  }
+  return (
+    localStorage.getItem("client_authToken") ||
+    localStorage.getItem("clientAuthToken") ||
+    localStorage.getItem("authToken") ||
+    null
+  );
+};
+
 export default function Perfil() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -52,7 +65,8 @@ export default function Perfil() {
   useEffect(() => {
     const cargarPedidos = async () => {
       try {
-        const token = localStorage.getItem("authToken");
+        const token = getClientToken();
+        if (!token) throw new Error("Sin token");
         const response = await fetch(`${import.meta.env.VITE_API_URL}/pedidos/pedido/`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -97,7 +111,12 @@ export default function Perfil() {
     e.preventDefault();
 
     try {
-      const token = localStorage.getItem("authToken");
+      const token = getClientToken();
+      if (!token) {
+        alert("Tu sesi��n expir��. Inici�� nuevamente.");
+        logout();
+        return;
+      }
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/usuarios/usuarios/${user.id}/`,
         {
@@ -151,7 +170,12 @@ export default function Perfil() {
     }
 
     try {
-      const token = localStorage.getItem("authToken");
+      const token = getClientToken();
+      if (!token) {
+        alert("Tu sesi��n expir��. Inici�� nuevamente.");
+        logout();
+        return;
+      }
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/usuarios/usuarios/${user.id}/cambiar_password/`,
         {

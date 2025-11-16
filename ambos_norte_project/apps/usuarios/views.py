@@ -72,11 +72,11 @@ class UsuarioViewSet(viewsets.ModelViewSet):
         """
         if self.action in ['login', 'registro']:
             return [AllowAny()]
-        elif self.action in ['me']:
+        if self.action in ['me']:
             return [IsAuthenticated()]
-        else:
-            # list, retrieve, update, destroy requieren ser admin
-            return [IsAuthenticated(), IsAdminUser()]
+        if self.action in ['retrieve', 'update', 'partial_update']:
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), IsAdminUser()]
     
     def destroy(self, request, *args, **kwargs):
         """
@@ -318,3 +318,20 @@ class DireccionViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         # Asignar automáticamente el usuario autenticado
         serializer.save(usuario=self.request.user)
+    def update(self, request, *args, **kwargs):
+        usuario = self.get_object()
+        if not request.user.is_staff and usuario.id != request.user.id:
+            return Response(
+                {'error': 'No tienes permiso para modificar este usuario'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        usuario = self.get_object()
+        if not request.user.is_staff and usuario.id != request.user.id:
+            return Response(
+                {'error': 'No tienes permiso para modificar este usuario'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().partial_update(request, *args, **kwargs)

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * EnvioPago.jsx - Página de checkout con integración de MercadoPago
  * Ubicación: src/pages/EnvioPago.jsx
  * 
@@ -42,70 +42,45 @@ export default function EnvioPago() {
   }, [navigate]);
 
   useEffect(() => {
-    let active = true;
-    const mergeUserData = (data) => {
-      if (!data || !active) return;
-      const perfil = data.perfil || data.profile || {};
-      setForm((prev) => ({
-        ...prev,
-        nombre:
-          prev.nombre ||
-          data.first_name ||
-          data.nombre ||
-          perfil.nombre ||
-          data.username ||
-          "",
-        apellido:
-          prev.apellido ||
-          data.last_name ||
-          data.apellido ||
-          perfil.apellido ||
-          "",
-        email: prev.email || data.email || perfil.email || "",
-        telefono: prev.telefono || data.telefono || perfil.telefono || "",
-        direccion: prev.direccion || data.direccion || perfil.direccion || "",
-        ciudad: prev.ciudad || data.ciudad || perfil.ciudad || "",
-      }));
-    };
-
     const storedUser =
       (typeof authService.getClienteUser === "function" && authService.getClienteUser()) || null;
     if (storedUser) {
-      mergeUserData(storedUser);
+      setForm((prev) => ({
+        ...prev,
+        nombre: prev.nombre || storedUser.first_name || storedUser.nombre || "",
+        apellido: prev.apellido || storedUser.last_name || storedUser.apellido || "",
+        email: prev.email || storedUser.email || "",
+        telefono: prev.telefono || storedUser.telefono || "",
+        direccion: prev.direccion || storedUser.direccion || "",
+        ciudad: prev.ciudad || storedUser.ciudad || "",
+      }));
     }
 
+    const token =
+      (typeof authService.getClienteToken === "function" && authService.getClienteToken()) ||
+      localStorage.getItem("client_authToken") ||
+      localStorage.getItem("authToken");
+    if (!token) return;
     (async () => {
-      try {
-        if (typeof authService.getProfile === "function") {
-          const profile = await authService.getProfile(false);
-          mergeUserData(profile);
-          return;
-        }
-      } catch (error) {
-        console.warn("No se pudo obtener perfil (authService):", error);
-      }
-
-      const token =
-        (typeof authService.getClienteToken === "function" && authService.getClienteToken()) ||
-        localStorage.getItem("client_authToken") ||
-        localStorage.getItem("clientAuthToken") ||
-        localStorage.getItem("authToken");
-      if (!token) return;
       try {
         const res = await fetch(`${import.meta.env.VITE_API_URL}/auth/me/`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) return;
         const data = await res.json();
-        mergeUserData(data);
-      } catch (error) {
-        console.warn("No se pudo obtener perfil (fetch):", error);
+        setForm((prev) => ({
+          ...prev,
+          nombre: prev.nombre || data.first_name || data.nombre || "",
+          apellido: prev.apellido || data.last_name || data.apellido || "",
+          email: prev.email || data.email || "",
+          telefono: prev.telefono || data.telefono || "",
+          direccion: prev.direccion || data.direccion || "",
+          ciudad: prev.ciudad || data.ciudad || "",
+        }));
+      } catch {
+        // ignore
       }
     })();
-
-    return () => {
-      active = false;
-    };
   }, []);
 
   const total = useMemo(
