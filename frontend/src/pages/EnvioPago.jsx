@@ -58,7 +58,9 @@ export default function EnvioPago() {
           email: prev.email || data.email || "",
           telefono: prev.telefono || data.telefono || "",
         }));
-      } catch { }
+      } catch { 
+        throw new Error("ff");
+      }
     })();
   }, []);
 
@@ -161,10 +163,12 @@ export default function EnvioPago() {
           storedOrder = created || storedOrder;
         } else {
           let msg = "No se pudo registrar el pedido";
-          try {
-            const err = await res.json();
-            msg = err.detail || JSON.stringify(err);
-          } catch { }
+          try { 
+            const err = await res.json(); 
+            msg = err.detail || JSON.stringify(err); 
+          } catch { 
+            throw new Error("ff");
+          }
           alert(msg);
           setLoading(false);
           return;
@@ -182,8 +186,11 @@ export default function EnvioPago() {
         const list = rawList ? JSON.parse(rawList) : [];
         const next = [storedOrder, ...Array.isArray(list) ? list : []];
         localStorage.setItem("orders_local", JSON.stringify(next));
-      } catch { }
-
+      } catch { 
+        throw new Error("ff");
+        
+      }
+      
       localStorage.removeItem("cart");
       navigate("/compra-exitosa");
     } catch (err) {
@@ -249,7 +256,10 @@ export default function EnvioPago() {
         try {
           const err = await resPedido.json();
           msg = err.detail || JSON.stringify(err);
-        } catch { }
+        } catch { 
+          throw new Error("XD");
+          
+        }
         throw new Error(msg);
       }
 
@@ -270,7 +280,9 @@ export default function EnvioPago() {
           email: form.email,
           phone: form.telefono,
         },
-        frontend_url: window.location.origin, // URL base del frontend
+        frontend_url: import.meta.env.DEV 
+                ? "http://127.0.0.1:5173"
+                : window.location.origin, // URL base del frontend
       };
 
       console.log("💳 Creando preferencia de pago...", preferenceData);
