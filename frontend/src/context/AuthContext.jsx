@@ -15,43 +15,20 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [currentPath, setCurrentPath] = useState(window.location.pathname);
 
-  // Determinar si estamos en área de admin basado en la ruta
-  const isAdminArea = currentPath.startsWith('/admin');
+  // Determinar si estamos en área de admin basado en la ruta ACTUAL
+  const isAdminArea = window.location.pathname.startsWith('/admin');
 
   // Calcular isAdmin basado en el user actual
   const isAdmin = user?.tipo_usuario === 'administrador' || user?.is_staff === true;
 
-  // Escuchar cambios en la URL
-  useEffect(() => {
-    const handleLocationChange = () => {
-      setCurrentPath(window.location.pathname);
-    };
-
-    // Escuchar eventos de navegación
-    window.addEventListener('popstate', handleLocationChange);
-    
-    // También crear un observer para detectar cambios de ruta en SPA
-    const observer = new MutationObserver(handleLocationChange);
-    observer.observe(document.querySelector('body'), { 
-      childList: true, 
-      subtree: true 
-    });
-
-    return () => {
-      window.removeEventListener('popstate', handleLocationChange);
-      observer.disconnect();
-    };
-  }, []);
-
-  // Cargar usuario al iniciar o cuando cambia la ruta
+  // Cargar usuario al iniciar - SOLO UNA VEZ al montar
   useEffect(() => {
     checkAuth();
-  }, [currentPath]);
+  }, []); // Sin dependencias para evitar re-renders infinitos
 
   const checkAuth = async () => {
-    const adminArea = currentPath.startsWith('/admin');
+    const adminArea = window.location.pathname.startsWith('/admin');
     
     if (adminArea) {
       // Área de admin - cargar sesión de admin
@@ -63,9 +40,15 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
 
       if (authenticated && !currentUser) {
-        const profile = await authService.getProfile(true);
-        if (profile) {
-          setUser(profile);
+        try {
+          const profile = await authService.getProfile(true);
+          if (profile) {
+            setUser(profile);
+          }
+        } catch (error) {
+          console.error('Error al cargar perfil de admin:', error);
+          setIsAuthenticated(false);
+          setUser(null);
         }
       }
     } else {
@@ -78,9 +61,15 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
 
       if (authenticated && !currentUser) {
-        const profile = await authService.getProfile(false);
-        if (profile) {
-          setUser(profile);
+        try {
+          const profile = await authService.getProfile(false);
+          if (profile) {
+            setUser(profile);
+          }
+        } catch (error) {
+          console.error('Error al cargar perfil de cliente:', error);
+          setIsAuthenticated(false);
+          setUser(null);
         }
       }
     }
@@ -187,6 +176,7 @@ export const AuthProvider = ({ children }) => {
     logoutCliente,
     updateProfile,
     refreshUser,
+    checkAuth, // Exportar para poder refrescar manualmente si es necesario
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

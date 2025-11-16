@@ -14,14 +14,27 @@ const api = axios.create({
 // Interceptor para agregar token de autenticación
 api.interceptors.request.use(
   (config) => {
-    // Detectar si la petición es para área de admin
-    const isAdminRequest = config.url?.includes('/admin') || 
-                          window.location.pathname.startsWith('/admin');
+    // Detectar si la petición es para área de admin basado en la URL y ruta actual
+    const isAdminUrl = config.url?.includes('/admin');
+    const isAdminPath = window.location.pathname.startsWith('/admin');
     
-    // Obtener el token apropiado según el área
-    const token = isAdminRequest 
-      ? localStorage.getItem('admin_authToken')
-      : localStorage.getItem('client_authToken');
+    // Obtener tokens disponibles
+    const adminToken = localStorage.getItem('admin_authToken');
+    const clientToken = localStorage.getItem('client_authToken');
+    
+    // Lógica mejorada para seleccionar el token correcto:
+    // 1. Si la URL o ruta es de admin, usar token de admin
+    // 2. Si estamos en área de cliente Y solo hay token de cliente, usar token de cliente
+    // 3. Si estamos en área de cliente pero solo hay token de admin, NO enviar token
+    let token = null;
+    
+    if (isAdminUrl || isAdminPath) {
+      // Área de admin - usar token de admin si existe
+      token = adminToken;
+    } else {
+      // Área de cliente - SOLO usar token de cliente, ignorar token de admin
+      token = clientToken;
+    }
     
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -43,15 +56,23 @@ api.interceptors.response.use(
       const isAdminArea = window.location.pathname.startsWith('/admin');
       
       if (isAdminArea) {
+        // Limpiar sesión de admin
         localStorage.removeItem('admin_authToken');
         localStorage.removeItem('admin_refreshToken');
         localStorage.removeItem('admin_user');
-        window.location.href = '/admin/login';
+        
+        // Solo redirigir si NO estamos ya en la página de login
+        if (!window.location.pathname.includes('/admin/login')) {
+          window.location.href = '/admin/login';
+        }
       } else {
+        // Limpiar sesión de cliente
         localStorage.removeItem('client_authToken');
         localStorage.removeItem('client_refreshToken');
         localStorage.removeItem('client_user');
-        window.location.href = '/registro';
+        
+        // NO redirigir automáticamente para evitar loops
+        // El componente que reciba el error 401 manejará la redirección
       }
     }
     return Promise.reject(error);
