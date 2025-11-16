@@ -7,6 +7,7 @@ class ItemCarritoSerializer(serializers.ModelSerializer):
     
     producto = ProductoSerializer(read_only=True)
     subtotal = serializers.SerializerMethodField()
+    variante_info = serializers.SerializerMethodField()
 
     class Meta:
         model = ItemCarrito
@@ -15,6 +16,18 @@ class ItemCarritoSerializer(serializers.ModelSerializer):
     
     def get_subtotal(self, obj):
         return obj.subtotal()
+    
+    def get_variante_info(self, obj):
+        """Retorna información de la variante seleccionada"""
+        if obj.variante:
+            return {
+                'id': obj.variante.id,
+                'talla': obj.variante.talla.nombre,
+                'color': obj.variante.color.nombre,
+                'stock': obj.variante.stock
+            }
+        return None
+
 
 class CarritoSerializer(serializers.ModelSerializer):
     

@@ -399,18 +399,23 @@ export default function AdminPedidos() {
                           )}
                           <div className="flex-1">
                             <p className="font-medium">{item.nombre_producto}</p>
-                            <div className="flex flex-wrap gap-2 mt-1">
-                              {item.variante_info?.talla_nombre && (
-                                <span className="text-xs px-2 py-0.5 bg-gray-200 rounded-md font-medium text-gray-700">
-                                  Talla: {item.variante_info.talla_nombre}
-                                </span>
-                              )}
-                              {item.variante_info?.color_nombre && (
-                                <span className="text-xs px-2 py-0.5 bg-gray-200 rounded-md font-medium text-gray-700">
-                                  Color: {item.variante_info.color_nombre}
-                                </span>
-                              )}
-                            </div>
+                            
+                            {/* ✅ CORREGIDO: Mostrar información de la variante */}
+                            {item.variante_info && (
+                              <div className="flex flex-wrap gap-2 mt-1">
+                                {item.variante_info.talla && (
+                                  <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-800 rounded-md font-medium">
+                                    Talla: {item.variante_info.talla}
+                                  </span>
+                                )}
+                                {item.variante_info.color && (
+                                  <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-800 rounded-md font-medium">
+                                    Color: {item.variante_info.color}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                            
                             <p className="text-sm text-gray-600 mt-1">
                               Cantidad: {item.cantidad} x ${parseFloat(item.precio_unitario).toFixed(2)}
                             </p>

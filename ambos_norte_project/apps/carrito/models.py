@@ -1,7 +1,8 @@
 from django.db import models
 from django.conf import settings
-from apps.catalogo.models import Producto
+from apps.catalogo.models import Producto, ProductoVariante
 from django.core.exceptions import ValidationError
+
 # Create your models here.
 class Carrito(models.Model):
     """
@@ -51,27 +52,47 @@ class ItemCarrito(models.Model):
         Producto, 
         on_delete=models.CASCADE
     )
+    variante = models.ForeignKey(
+        ProductoVariante,
+        on_delete=models.CASCADE,
+        related_name='items_carrito',
+        blank=True,
+        null=True,
+        help_text='Variante específica del producto seleccionada'
+    )
     cantidad = models.IntegerField(default=1)
     precio_unitario = models.DecimalField(max_digits=10, decimal_places=2)
     fecha_agregado = models.DateTimeField(auto_now_add=True)
+    
     def save(self, *args, **kwargs):
         # Validar stock antes de guardar
-        if not self.producto.tiene_stock(self.cantidad):
-            raise ValidationError(
-                f"Stock insuficiente para {self.producto.nombre}. "
-                f"Disponible: {self.producto.stock}"
-            )
+        if self.variante:
+            # Si hay variante, validar el stock de la variante
+            if not self.variante.tiene_stock(self.cantidad):
+                raise ValidationError(
+                    f"Stock insuficiente para {self.producto.nombre} "
+                    f"({self.variante.talla.nombre} - {self.variante.color.nombre}). "
+                    f"Disponible: {self.variante.stock}"
+                )
+        else:
+            # Si no hay variante (compatibilidad con datos antiguos), validar stock total
+            if not self.producto.stock_total() >= self.cantidad:
+                raise ValidationError(
+                    f"Stock insuficiente para {self.producto.nombre}. "
+                    f"Disponible: {self.producto.stock_total()}"
+                )
         super().save(*args, **kwargs)
     
     class Meta:
         db_table = 'items_carrito'
         verbose_name = 'Item de Carrito'
         verbose_name_plural = 'Items de Carrito'
-        unique_together = ['carrito', 'producto']  # No duplicar productos
+        unique_together = ['carrito', 'producto', 'variante']  # No duplicar productos con misma variante
 
     
     def __str__(self):
-        return f"{self.cantidad}x {self.producto.nombre}"
+        variante_info = f" ({self.variante.talla.nombre} - {self.variante.color.nombre})" if self.variante else ""
+        return f"{self.cantidad}x {self.producto.nombre}{variante_info}"
     
     def subtotal(self):
         """Calcula el subtotal del item"""

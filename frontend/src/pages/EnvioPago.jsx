@@ -1,4 +1,3 @@
-
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import paymentsService from "../services/payments";
@@ -99,7 +98,6 @@ export default function EnvioPago() {
         console.warn("No se pudo obtener perfil (authService):", error);
       }
 
-      // ✅ FIX: Usar getAuthToken()
       const token = getAuthToken();
       if (!token) return;
       try {
@@ -154,7 +152,6 @@ export default function EnvioPago() {
 
     try {
       setLoading(true);
-      // ✅ FIX: Usar getAuthToken()
       const token = getAuthToken();
 
       const pedido = {
@@ -179,6 +176,7 @@ export default function EnvioPago() {
         const payload = {
           items: (items || []).map((it) => ({
             producto_id: it.id,
+            variante_id: it.variante_id || null, // ✅ AGREGADO: Incluir variante_id
             cantidad: it.cantidad || 1,
             precio_unitario: it.precio || 0,
           })),
@@ -262,7 +260,6 @@ export default function EnvioPago() {
       setLoading(true);
       setError(null);
 
-      // ✅ FIX: Usar getAuthToken()
       const token = getAuthToken();
 
       if (!token) {
@@ -275,6 +272,7 @@ export default function EnvioPago() {
       const payload = {
         items: (items || []).map((it) => ({
           producto_id: it.id,
+          variante_id: it.variante_id || null, // ✅ AGREGADO: Incluir variante_id
           cantidad: it.cantidad || 1,
           precio_unitario: it.precio || 0,
         })),
