@@ -30,6 +30,8 @@ urlpatterns = [
     path('dashboard/', include('apps.panel_admin.urls')),
     path('api/auth/', include('apps.usuarios.auth_urls')),
     path('api/analytics/', include('apps.analytics.urls')),
+    path('api/search-insights/', include('apps.search_insights.urls')),
+
 ]
 
 if settings.DEBUG:

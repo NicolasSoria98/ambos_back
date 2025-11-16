@@ -17,6 +17,7 @@ import KPICard from '../../components/admin/KpiCard';
 import ChartCard from '../../components/admin/Chartcard';
 import analyticsService from '../../services/analytics';
 import productsService from '../../services/products';
+import ordersService from '../../services/orders';
 
 // Registrar componentes de Chart.js
 ChartJS.register(
@@ -35,6 +36,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [kpis, setKpis] = useState({});
   const [topProductos, setTopProductos] = useState([]);
+  const [categoriasVendidas, setCategoriasVendidas] = useState([]);
   const [variantesStockBajo, setVariantesStockBajo] = useState([]);
   const [ventasPorPagos, setVentasPorPagos] = useState([]);
   const [categorias, setCategorias] = useState([]);
@@ -44,25 +46,33 @@ export default function AdminDashboard() {
     loadDashboardData();
   }, []);
 
+  // Función para formatear fecha en formato local YYYY-MM-DD
+  const formatoFechaLocal = (fecha) => {
+    const year = fecha.getFullYear();
+    const month = String(fecha.getMonth() + 1).padStart(2, '0');
+    const day = String(fecha.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const loadDashboardData = async () => {
     try {
       setLoading(true);
 
-      // Fecha de hoy y ayer
+      // Fecha de hoy y ayer (usando hora local)
       const hoy = new Date();
-      const ayer = new Date();
+      hoy.setHours(0, 0, 0, 0); // Resetear hora para comparaciones
+      
+      const ayer = new Date(hoy);
       ayer.setDate(hoy.getDate() - 1);
-
-      const formatoFecha = (fecha) => fecha.toISOString().split('T')[0];
 
       // ========== VENTAS POR PAGOS APROBADOS ==========
       const ventasHoyData = await analyticsService.getVentasPorPagosAprobados(
-        formatoFecha(hoy),
-        formatoFecha(hoy)
+        formatoFechaLocal(hoy),
+        formatoFechaLocal(hoy)
       );
       const ventasAyerData = await analyticsService.getVentasPorPagosAprobados(
-        formatoFecha(ayer),
-        formatoFecha(ayer)
+        formatoFechaLocal(ayer),
+        formatoFechaLocal(ayer)
       );
 
       const ventasHoy = ventasHoyData.total || 0;
@@ -78,6 +88,36 @@ export default function AdminDashboard() {
         : 0;
 
       // ========== PEDIDOS ==========
+      const todosPedidosResponse = await ordersService.getAll();
+      const todosPedidos = todosPedidosResponse.results || todosPedidosResponse || [];
+
+      console.log('📦 Total de pedidos obtenidos:', todosPedidos.length);
+
+      // Filtrar pedidos de hoy
+      const pedidosHoy = todosPedidos.filter(pedido => {
+        if (!pedido.fecha_pedido) return false;
+        const fechaPedido = pedido.fecha_pedido.split('T')[0];
+        return fechaPedido === formatoFechaLocal(hoy);
+      });
+
+      // Filtrar pedidos de ayer
+      const pedidosAyer = todosPedidos.filter(pedido => {
+        if (!pedido.fecha_pedido) return false;
+        const fechaPedido = pedido.fecha_pedido.split('T')[0];
+        return fechaPedido === formatoFechaLocal(ayer);
+      });
+
+      const cantidadPedidosHoy = pedidosHoy.length;
+      const cantidadPedidosAyer = pedidosAyer.length;
+      const cambioPedidos = cantidadPedidosAyer > 0
+        ? ((cantidadPedidosHoy - cantidadPedidosAyer) / cantidadPedidosAyer) * 100
+        : 0;
+
+      console.log('📦 Pedidos de hoy:', cantidadPedidosHoy);
+      console.log('📦 Pedidos de ayer:', cantidadPedidosAyer);
+      console.log('📦 Cambio:', cambioPedidos.toFixed(2) + '%');
+      
+      // Obtener resumen de métricas para usuarios
       const resumenData = await analyticsService.getResumenMetricas();
       
       // ========== TOP 5 PRODUCTOS MÁS VENDIDOS ==========
@@ -89,29 +129,35 @@ export default function AdminDashboard() {
       setVariantesStockBajo(variantesStockBajoData);
 
       // ========== VENTAS ÚLTIMOS 30 DÍAS (POR PAGOS APROBADOS) ==========
-      const hace30Dias = new Date();
-      hace30Dias.setDate(hoy.getDate() - 30);
+      const hace30Dias = new Date(hoy);
+      hace30Dias.setDate(hoy.getDate() - 29); // 29 días atrás + hoy = 30 días
+
+      console.log('📅 Rango de fechas para ventas:');
+      console.log('  Desde:', formatoFechaLocal(hace30Dias));
+      console.log('  Hasta:', formatoFechaLocal(hoy));
 
       // Obtener TODOS los pagos aprobados del mes de una sola vez
       const todosPagosDelMes = await analyticsService.getVentasPorPagosAprobados(
-        formatoFecha(hace30Dias),
-        formatoFecha(hoy)
+        formatoFechaLocal(hace30Dias),
+        formatoFechaLocal(hoy)
       );
 
-      // ========== TICKET PROMEDIO DEL MES (reutilizamos todosPagosDelMes) ==========
+      console.log('💰 Pagos del mes obtenidos:', todosPagosDelMes.pagos?.length || 0);
+
+      // ========== TICKET PROMEDIO DEL MES ==========
       const ticketPromedioMes = todosPagosDelMes.cantidad_pagos > 0 
         ? todosPagosDelMes.total / todosPagosDelMes.cantidad_pagos 
         : 0;
       
       // Para el cambio, calcular ticket promedio del mes anterior
-      const hace60Dias = new Date();
+      const hace60Dias = new Date(hoy);
       hace60Dias.setDate(hoy.getDate() - 60);
-      const hace31Dias = new Date();
-      hace31Dias.setDate(hoy.getDate() - 31);
+      const hace31Dias = new Date(hoy);
+      hace31Dias.setDate(hoy.getDate() - 30);
       
       const ventasMesAnteriorData = await analyticsService.getVentasPorPagosAprobados(
-        formatoFecha(hace60Dias),
-        formatoFecha(hace31Dias)
+        formatoFechaLocal(hace60Dias),
+        formatoFechaLocal(hace31Dias)
       );
       
       const ticketPromedioMesAnterior = ventasMesAnteriorData.cantidad_pagos > 0 
@@ -129,8 +175,8 @@ export default function AdminDashboard() {
           cambio: cambioVentas,
         },
         pedidos: {
-          hoy: cantidadPagosHoy,
-          cambio: cambioPagos,
+          hoy: cantidadPedidosHoy,
+          cambio: cambioPedidos,
         },
         usuarios: {
           hoy: resumenData.usuarios_activos_hoy || 0,
@@ -142,34 +188,118 @@ export default function AdminDashboard() {
         },
       });
 
-      // Agrupar pagos por fecha
+      // Agrupar pagos por fecha (USANDO FECHA LOCAL)
       const ventasPorFecha = {};
-      todosPagosDelMes.pagos.forEach(pago => {
-        const fechaPago = (pago.fecha_pago || pago.fecha_creacion).split('T')[0];
-        if (!ventasPorFecha[fechaPago]) {
-          ventasPorFecha[fechaPago] = 0;
-        }
-        ventasPorFecha[fechaPago] += parseFloat(pago.monto || 0);
-      });
+      
+      if (todosPagosDelMes.pagos && Array.isArray(todosPagosDelMes.pagos)) {
+        todosPagosDelMes.pagos.forEach(pago => {
+          // Extraer solo la fecha (YYYY-MM-DD) sin conversión de zona horaria
+          const fechaPago = (pago.fecha_pago || pago.fecha_creacion).split('T')[0];
+          
+          console.log(`💳 Pago #${pago.id}: Fecha=${fechaPago}, Monto=${pago.monto}`);
+          
+          if (!ventasPorFecha[fechaPago]) {
+            ventasPorFecha[fechaPago] = 0;
+          }
+          ventasPorFecha[fechaPago] += parseFloat(pago.monto || 0);
+        });
+      }
 
-      // Crear array con todos los días (incluso si no hay ventas)
+      console.log('📊 Ventas agrupadas por fecha:', ventasPorFecha);
+
+      // Crear array con todos los días (últimos 30 días incluyendo HOY)
       const ventasPorDia = [];
-      for (let i = 30; i >= 0; i--) {
-        const fecha = new Date();
+      for (let i = 29; i >= 0; i--) {
+        const fecha = new Date(hoy);
         fecha.setDate(hoy.getDate() - i);
-        const fechaStr = formatoFecha(fecha);
+        const fechaStr = formatoFechaLocal(fecha);
         
         ventasPorDia.push({
           fecha: fechaStr,
           total: ventasPorFecha[fechaStr] || 0
         });
       }
+
+      console.log('📈 Datos para el gráfico:', ventasPorDia);
+      console.log('📅 Primera fecha:', ventasPorDia[0]?.fecha);
+      console.log('📅 Última fecha:', ventasPorDia[ventasPorDia.length - 1]?.fecha);
+      
       setVentasPorPagos(ventasPorDia);
 
-      // ========== CATEGORÍAS ==========
-      const categoriasData = await productsService.getCategories();
-      setCategorias(categoriasData);
+      // ========== CATEGORÍAS VENDIDAS ==========
+      const categoriasCantidad = {};
+      let totalUnidadesVendidas = 0;
 
+      console.log('🔍 Procesando pagos para categorías:', todosPagosDelMes.pagos?.length || 0);
+
+      // Procesar cada pago aprobado
+      if (todosPagosDelMes.pagos && Array.isArray(todosPagosDelMes.pagos)) {
+        for (const pago of todosPagosDelMes.pagos) {
+          try {
+            // Obtener el pedido asociado al pago
+            const pedidoId = pago.pedido;
+            if (!pedidoId) continue;
+
+            const pedido = await ordersService.getById(pedidoId);
+            
+            // Procesar los items del pedido
+            if (pedido.items && Array.isArray(pedido.items)) {
+              for (const item of pedido.items) {
+                const cantidad = parseInt(item.cantidad) || 0;
+                let categoria = 'Sin categoría';
+
+                // Intentar obtener categoría del item
+                if (item.producto_info?.categoria_nombre) {
+                  categoria = item.producto_info.categoria_nombre;
+                } else if (item.producto?.categoria_nombre) {
+                  categoria = item.producto.categoria_nombre;
+                } else if (item.categoria_nombre) {
+                  categoria = item.categoria_nombre;
+                } else if (item.producto) {
+                  // Obtener el producto completo
+                  try {
+                    const productoId = typeof item.producto === 'number' ? item.producto : item.producto.id;
+                    if (productoId) {
+                      const productoCompleto = await productsService.getById(productoId);
+                      categoria = productoCompleto.categoria_nombre || 'Sin categoría';
+                    }
+                  } catch (error) {
+                    console.error(`Error obteniendo producto ${item.producto}:`, error);
+                  }
+                }
+
+                if (!categoriasCantidad[categoria]) {
+                  categoriasCantidad[categoria] = 0;
+                }
+                
+                categoriasCantidad[categoria] += cantidad;
+                totalUnidadesVendidas += cantidad;
+              }
+            }
+          } catch (error) {
+            console.error(`❌ Error procesando pedido del pago ${pago.id}:`, error);
+          }
+        }
+      }
+
+      console.log('📊 Total de unidades vendidas:', totalUnidadesVendidas);
+      console.log('📊 Categorías encontradas:', Object.keys(categoriasCantidad));
+
+      // Convertir a array con porcentajes y ordenar
+      const categoriasConPorcentaje = Object.entries(categoriasCantidad)
+        .map(([nombre, cantidad]) => ({
+          nombre,
+          cantidad,
+          porcentaje: totalUnidadesVendidas > 0 
+            ? ((cantidad / totalUnidadesVendidas) * 100).toFixed(1)
+            : 0
+        }))
+        .sort((a, b) => b.cantidad - a.cantidad)
+        .slice(0, 5); // Top 5 categorías
+
+      console.log('✅ Categorías vendidas (últimos 30 días):', categoriasConPorcentaje);
+      setCategoriasVendidas(categoriasConPorcentaje);
+      
       // ========== PRODUCTOS INACTIVOS ==========
       const todosLosProductos = await productsService.getAll();
       const productos = todosLosProductos.results || todosLosProductos || [];
@@ -186,7 +316,7 @@ export default function AdminDashboard() {
   // Preparar datos para el gráfico de líneas (ventas por pagos aprobados)
   const ventasChartData = {
     labels: ventasPorPagos.map((v) => {
-      const fecha = new Date(v.fecha);
+      const fecha = new Date(v.fecha + 'T00:00:00'); // Agregar hora para evitar problemas de zona horaria
       return `${fecha.getDate()}/${fecha.getMonth() + 1}`;
     }),
     datasets: [
@@ -230,10 +360,10 @@ export default function AdminDashboard() {
 
   // Preparar datos para el gráfico de categorías
   const categoriasChartData = {
-    labels: categorias.slice(0, 5).map((c) => c.nombre),
+    labels: categoriasVendidas.map((c) => `${c.nombre} (${c.porcentaje}%)`),
     datasets: [
       {
-        data: categorias.slice(0, 5).map(() => Math.random() * 100),
+        data: categoriasVendidas.map((c) => parseFloat(c.porcentaje)),
         backgroundColor: [
           'rgba(99, 102, 241, 0.8)',
           'rgba(34, 197, 94, 0.8)',
@@ -256,6 +386,17 @@ export default function AdminDashboard() {
           padding: 10,
           font: {
             size: 11,
+          },
+        },
+      },
+      tooltip: {
+        callbacks: {
+          label: (context) => {
+            const categoria = categoriasVendidas[context.dataIndex];
+            return [
+              `${context.label}`,
+              `Unidades: ${categoria.cantidad}`,
+            ];
           },
         },
       },
@@ -406,7 +547,7 @@ export default function AdminDashboard() {
           </ChartCard>
 
           {/* Ventas por Categoría */}
-          <ChartCard title="Top Categorías" icon="fas fa-chart-pie">
+          <ChartCard title="Categorías vendidas (últimos 30 días)" icon="fas fa-chart-pie">
             <div className="relative" style={{ height: '250px' }}>
               <Doughnut data={categoriasChartData} options={categoriasChartOptions} />
             </div>
