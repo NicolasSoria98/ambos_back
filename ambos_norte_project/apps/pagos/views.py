@@ -470,20 +470,21 @@ class PagoViewSet(viewsets.ModelViewSet):
     def cambiar_estado(self, request, pk=None):
         """
         Permite al admin cambiar manualmente el estado de un pago
+        SOLO entre: aprobado, pendiente, cancelado
         
         PATCH /api/pagos/pago/{id}/cambiar_estado/
         
         Body:
         {
-            "estado": "aprobado" | "pendiente" | "rechazado" | "cancelado"
+            "estado": "aprobado" | "pendiente" | "cancelado"
         }
         """
         try:
             pago = self.get_object()
             nuevo_estado = request.data.get('estado')
             
-            # Validar que el estado sea válido
-            estados_validos = ['aprobado', 'pendiente', 'rechazado', 'cancelado', 'devuelto', 'en_proceso']
+            # Validar que el estado sea válido - SOLO aprobado, pendiente, cancelado
+            estados_validos = ['aprobado', 'pendiente', 'cancelado']
             
             if not nuevo_estado:
                 return Response({
@@ -527,7 +528,7 @@ class PagoViewSet(viewsets.ModelViewSet):
                     )
                     print(f"✅ Pedido #{pedido.id} actualizado a 'en_preparacion'")
                 
-                elif nuevo_estado in ['rechazado', 'cancelado']:
+                elif nuevo_estado == 'cancelado':
                     if pedido.estado != 'cancelado':
                         pedido.estado = 'cancelado'
                         pedido.activo = False
@@ -537,7 +538,7 @@ class PagoViewSet(viewsets.ModelViewSet):
                             pedido=pedido,
                             estado_anterior=estado_anterior,
                             estado_nuevo='cancelado',
-                            comentario=f'Pago {nuevo_estado} manualmente por admin - Pago ID: {pago.id}'
+                            comentario=f'Pago cancelado manualmente por admin - Pago ID: {pago.id}'
                         )
                         print(f"❌ Pedido #{pedido.id} cancelado")
             

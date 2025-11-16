@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Chart as ChartJS,
@@ -12,6 +11,7 @@ import {
   Legend,
 } from 'chart.js';
 import { Line, Bar } from 'react-chartjs-2';
+import AdminSidebar from '../../components/admin/AdminSidebar';
 import searchInsightsService from '../../services/searchInsightsService';
 
 ChartJS.register(
@@ -35,6 +35,13 @@ const AdminGoogle = () => {
   const [keywords, setKeywords] = useState(['']);
   const [keywordInput, setKeywordInput] = useState('');
   const [sugerencias, setSugerencias] = useState([]);
+  const [buscandoSugerencias, setBuscandoSugerencias] = useState(false);
+  
+  // Cache de sugerencias
+  const sugerenciasCache = useRef({});
+  
+  // Debounce timer
+  const debounceTimer = useRef(null);
   
   // Fechas
   const hoy = new Date().toISOString().split('T')[0];
@@ -53,6 +60,8 @@ const AdminGoogle = () => {
   useEffect(() => {
     // Resetear región al cambiar país
     setSelectedRegion('');
+    // Limpiar cache al cambiar país
+    sugerenciasCache.current = {};
   }, [selectedPais]);
 
   const cargarGeoCodes = async () => {
@@ -76,20 +85,59 @@ const AdminGoogle = () => {
     setKeywords(keywords.filter((_, i) => i !== index));
   };
 
-  const handleBuscarSugerencias = async (texto) => {
+  const handleBuscarSugerencias = (texto) => {
     setKeywordInput(texto);
     
-    if (texto.length >= 2) {
+    // Limpiar sugerencias si el texto es muy corto
+    if (texto.length < 2) {
+      setSugerencias([]);
+      setBuscandoSugerencias(false);
+      return;
+    }
+    
+    // Limpiar el timer anterior
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
+    }
+    
+    // Mostrar estado de carga
+    setBuscandoSugerencias(true);
+    
+    // Crear clave de cache
+    const cacheKey = `${selectedPais}:${texto.toLowerCase().trim()}`;
+    
+    // Verificar si ya está en cache
+    if (sugerenciasCache.current[cacheKey]) {
+      setSugerencias(sugerenciasCache.current[cacheKey]);
+      setBuscandoSugerencias(false);
+      return;
+    }
+    
+    // DEBOUNCING: Esperar 600ms después de que el usuario deje de escribir
+    debounceTimer.current = setTimeout(async () => {
       try {
         const data = await searchInsightsService.getSuggestions(texto, selectedPais);
-        setSugerencias(data.sugerencias || []);
+        
+        if (data.success && data.sugerencias) {
+          // Guardar en cache
+          sugerenciasCache.current[cacheKey] = data.sugerencias;
+          setSugerencias(data.sugerencias);
+        } else {
+          // Si hay rate limiting u otro error, no mostrar nada
+          setSugerencias([]);
+          
+          // Si es rate limiting, limpiar cache para que no siga intentando
+          if (data.error && data.error.includes('429')) {
+            console.warn('Google está limitando las peticiones. Intenta más lento.');
+          }
+        }
       } catch (error) {
         console.error('Error buscando sugerencias:', error);
         setSugerencias([]);
+      } finally {
+        setBuscandoSugerencias(false);
       }
-    } else {
-      setSugerencias([]);
-    }
+    }, 600); // 600ms de espera
   };
 
   const handleSeleccionarSugerencia = (sugerencia) => {
@@ -124,11 +172,26 @@ const AdminGoogle = () => {
       
     } catch (error) {
       console.error('Error consultando tendencias:', error);
-      alert('Error al consultar tendencias: ' + (error.response?.data?.error || error.message));
+      
+      // Mensaje más amigable para rate limiting
+      if (error.response?.status === 429 || error.response?.data?.detalle?.includes('429')) {
+        alert('Google está limitando las peticiones. Por favor espera unos minutos e intenta nuevamente.');
+      } else {
+        alert('Error al consultar tendencias: ' + (error.response?.data?.error || error.message));
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  // Limpiar timer al desmontar
+  useEffect(() => {
+    return () => {
+      if (debounceTimer.current) {
+        clearTimeout(debounceTimer.current);
+      }
+    };
+  }, []);
 
   // Preparar datos para gráfico de tendencia temporal
   const getTendenciaChart = () => {
@@ -203,8 +266,10 @@ const AdminGoogle = () => {
   const regionesDisponibles = selectedPais === 'AR' ? geoCodes.regiones.argentina || [] : [];
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-7xl mx-auto">
+    <div className="flex min-h-screen bg-gray-50">
+      <AdminSidebar />
+
+      <main className="flex-1 p-8">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
@@ -251,19 +316,26 @@ const AdminGoogle = () => {
             {keywords.filter(k => k.trim()).length < 5 && (
               <div className="relative">
                 <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={keywordInput}
-                    onChange={(e) => handleBuscarSugerencias(e.target.value)}
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleAgregarKeyword();
-                      }
-                    }}
-                    placeholder="Escribe una palabra clave..."
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
+                  <div className="flex-1 relative">
+                    <input
+                      type="text"
+                      value={keywordInput}
+                      onChange={(e) => handleBuscarSugerencias(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAgregarKeyword();
+                        }
+                      }}
+                      placeholder="Escribe una palabra clave..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                    {buscandoSugerencias && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                        <i className="fas fa-spinner fa-spin text-gray-400"></i>
+                      </div>
+                    )}
+                  </div>
                   <button
                     onClick={handleAgregarKeyword}
                     disabled={!keywordInput.trim()}
@@ -293,6 +365,12 @@ const AdminGoogle = () => {
                 )}
               </div>
             )}
+            
+            {/* Nota sobre sugerencias */}
+            <p className="text-xs text-gray-500 mt-2">
+              <i className="fas fa-info-circle mr-1"></i>
+              Las sugerencias aparecen después de escribir (espera un momento después de escribir)
+            </p>
           </div>
 
           {/* Filtros de Ubicación y Fecha */}
@@ -690,7 +768,7 @@ const AdminGoogle = () => {
             </p>
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 };
