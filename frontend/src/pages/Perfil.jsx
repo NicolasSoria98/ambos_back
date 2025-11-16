@@ -52,7 +52,12 @@ export default function Perfil() {
   useEffect(() => {
     const cargarPedidos = async () => {
       try {
-        const token = localStorage.getItem("authToken");
+        const token = authService.getClienteToken();
+        if (!token) {
+          console.error("No hay token de cliente disponible");
+          return;
+        }
+
         const response = await fetch(`${import.meta.env.VITE_API_URL}/pedidos/pedido/`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -97,7 +102,13 @@ export default function Perfil() {
     e.preventDefault();
 
     try {
-      const token = localStorage.getItem("authToken");
+      const token = authService.getClienteToken();
+      if (!token) {
+        alert("No estás autenticado. Por favor inicia sesión nuevamente.");
+        navigate("/registro");
+        return;
+      }
+
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/usuarios/usuarios/${user.id}/`,
         {
@@ -151,7 +162,13 @@ export default function Perfil() {
     }
 
     try {
-      const token = localStorage.getItem("authToken");
+      const token = authService.getClienteToken();
+      if (!token) {
+        alert("No estás autenticado. Por favor inicia sesión nuevamente.");
+        navigate("/registro");
+        return;
+      }
+
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/usuarios/usuarios/${user.id}/cambiar_password/`,
         {

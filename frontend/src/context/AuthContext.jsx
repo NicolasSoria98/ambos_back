@@ -16,26 +16,61 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
+  // Determinar si estamos en área de admin basado en la ruta ACTUAL
+  const isAdminArea = window.location.pathname.startsWith('/admin');
+
   // Calcular isAdmin basado en el user actual
   const isAdmin = user?.tipo_usuario === 'administrador' || user?.is_staff === true;
-  // Cargar usuario al iniciar
+
+  // Cargar usuario al iniciar - SOLO UNA VEZ al montar
   useEffect(() => {
     checkAuth();
-  }, []);
+  }, []); // Sin dependencias para evitar re-renders infinitos
 
   const checkAuth = async () => {
-    const authenticated = authService.isAuthenticated();
-    const currentUser = authService.getCurrentUser();
+    const adminArea = window.location.pathname.startsWith('/admin');
     
-    setIsAuthenticated(authenticated);
-    setUser(currentUser);
-    setLoading(false);
+    if (adminArea) {
+      // Área de admin - cargar sesión de admin
+      const authenticated = authService.isAdminAuthenticated();
+      const currentUser = authService.getAdminUser();
+      
+      setIsAuthenticated(authenticated);
+      setUser(currentUser);
+      setLoading(false);
 
-    // Si hay token pero no hay datos del usuario, obtenerlos del servidor
-    if (authenticated && !currentUser) {
-      const profile = await authService.getProfile();
-      if (profile) {
-        setUser(profile);
+      if (authenticated && !currentUser) {
+        try {
+          const profile = await authService.getProfile(true);
+          if (profile) {
+            setUser(profile);
+          }
+        } catch (error) {
+          console.error('Error al cargar perfil de admin:', error);
+          setIsAuthenticated(false);
+          setUser(null);
+        }
+      }
+    } else {
+      // Área de cliente - cargar sesión de cliente
+      const authenticated = authService.isClienteAuthenticated();
+      const currentUser = authService.getClienteUser();
+      
+      setIsAuthenticated(authenticated);
+      setUser(currentUser);
+      setLoading(false);
+
+      if (authenticated && !currentUser) {
+        try {
+          const profile = await authService.getProfile(false);
+          if (profile) {
+            setUser(profile);
+          }
+        } catch (error) {
+          console.error('Error al cargar perfil de cliente:', error);
+          setIsAuthenticated(false);
+          setUser(null);
+        }
       }
     }
   };
@@ -49,8 +84,8 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(true);
       
       // Verificar que sea admin
-      if (!authService.isAdmin()) {
-        await logout();
+      if (result.user.tipo_usuario !== 'administrador' && !result.user.is_staff) {
+        await logoutAdmin();
         return {
           success: false,
           message: 'No tienes permisos de administrador',
@@ -85,16 +120,32 @@ export const AuthProvider = ({ children }) => {
     return result;
   };
 
-  // Logout
-  const logout = () => {
-    authService.logout();
+  // Logout de administrador
+  const logoutAdmin = () => {
+    authService.logoutAdmin();
     setUser(null);
     setIsAuthenticated(false);
   };
 
+  // Logout de cliente
+  const logoutCliente = () => {
+    authService.logoutCliente();
+    setUser(null);
+    setIsAuthenticated(false);
+  };
+
+  // Logout genérico (usa el apropiado según el área)
+  const logout = () => {
+    if (isAdminArea) {
+      logoutAdmin();
+    } else {
+      logoutCliente();
+    }
+  };
+
   // Actualizar perfil
   const updateProfile = async (userData) => {
-    const result = await authService.updateProfile(userData);
+    const result = await authService.updateProfile(userData, isAdminArea);
     
     if (result.success) {
       setUser(result.user);
@@ -105,7 +156,7 @@ export const AuthProvider = ({ children }) => {
 
   // Refrescar datos de usuario
   const refreshUser = async () => {
-    const updatedUser = await authService.getProfile();
+    const updatedUser = await authService.getProfile(isAdminArea);
     if (updatedUser) {
       setUser(updatedUser);
     }
@@ -116,12 +167,16 @@ export const AuthProvider = ({ children }) => {
     isAuthenticated,
     loading,
     isAdmin,
+    isAdminArea,
     loginAdmin,
     loginCliente,
     register,
     logout,
+    logoutAdmin,
+    logoutCliente,
     updateProfile,
     refreshUser,
+    checkAuth, // Exportar para poder refrescar manualmente si es necesario
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

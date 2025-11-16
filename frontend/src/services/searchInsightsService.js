@@ -17,8 +17,32 @@ const searchInsightsService = {
 
   // Obtener sugerencias de keywords
   getSuggestions: async (keyword, geo = 'AR') => {
-    const response = await api.post(`${BASE_URL}/suggestions/`, { keyword, geo });
-    return response.data;
+    try {
+      const response = await api.post(`${BASE_URL}/suggestions/`, { 
+        keyword: keyword.trim(), 
+        geo 
+      });
+      return response.data;
+    } catch (error) {
+      // Manejo mejorado de errores
+      console.error('Error en getSuggestions:', error);
+      
+      // Si hay respuesta del servidor pero con error
+      if (error.response?.data) {
+        return {
+          success: false,
+          sugerencias: [],
+          error: error.response.data.error || 'Error desconocido'
+        };
+      }
+      
+      // Si no hay respuesta (error de red, timeout, etc.)
+      return {
+        success: false,
+        sugerencias: [],
+        error: 'Error de conexión con el servidor'
+      };
+    }
   },
 };
 

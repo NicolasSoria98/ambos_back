@@ -51,6 +51,26 @@ class UsuarioSerializer(serializers.ModelSerializer):
         return instance
 
 
+class PerfilUpdateSerializer(serializers.ModelSerializer):
+    """
+    Serializer específico para que los usuarios actualicen su propio perfil
+    Solo incluye campos que los usuarios pueden modificar
+    """
+    class Meta:
+        model = Usuario
+        fields = ('first_name', 'last_name', 'telefono')
+        
+    def update(self, instance, validated_data):
+        """
+        Actualiza solo los campos permitidos del perfil
+        """
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        
+        instance.save()
+        return instance
+
+
 class DireccionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Direccion

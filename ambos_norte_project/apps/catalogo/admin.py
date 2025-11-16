@@ -54,8 +54,8 @@ class ProductoVarianteInline(admin.TabularInline):
 
 @admin.register(Producto)
 class ProductoAdmin(admin.ModelAdmin):
-    list_display = ['nombre', 'categoria', 'precio_base', 'get_stock_total', 'activo', 'destacado']
-    list_filter = ['categoria', 'activo', 'destacado']
+    list_display = ['nombre', 'categoria', 'precio_base', 'sexo', 'get_stock_total', 'activo', 'destacado']
+    list_filter = ['categoria', 'sexo', 'activo', 'destacado']
     search_fields = ['nombre', 'descripcion']
     list_editable = ['activo', 'destacado']
     inlines = [ProductoVarianteInline, ImagenProductoInline]
