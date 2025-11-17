@@ -1,631 +1,300 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import paymentsService from "../services/payments";
-import authService from "../services/auth";
+import { initMercadoPago } from '@mercadopago/sdk-react';
+import PaymentBrick from '../components/PaymentBrick';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
-const getAuthToken = () => {
-  // Intentar obtener token de cliente primero
-  const clientToken = authService.getClienteToken();
-  if (clientToken) return clientToken;
-  
-  // Si no hay token de cliente, intentar con admin
-  const adminToken = authService.getAdminToken();
-  if (adminToken) return adminToken;
-  
-  // Fallback: buscar en localStorage con nombres alternativos
-  return (
-    localStorage.getItem("client_authToken") ||
-    localStorage.getItem("admin_authToken") ||
-    localStorage.getItem("clientAuthToken") ||
-    localStorage.getItem("authToken") ||
-    null
-  );
-};
+initMercadoPago('TEST-4aa13959-24eb-4a20-8858-fbc57f97deb1');
+
+const COSTO_ENVIO = 2000;
 
 export default function EnvioPago() {
   const navigate = useNavigate();
-  const [items, setItems] = useState([]);
-  const [form, setForm] = useState({
-    nombre: "",
-    apellido: "",
-    direccion: "",
-    ciudad: "",
-    telefono: "",
-    email: "",
-    notas: "",
-  });
-  const [metodoEnvio, setMetodoEnvio] = useState("envio");
-  const [metodoPago, setMetodoPago] = useState("mercadopago");
-  const [loading, setLoading] = useState(false);
+  const [pedidoData, setPedidoData] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [tipoEntrega, setTipoEntrega] = useState('envio'); // 'envio' o 'retiro'
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("cart");
-      const cart = raw ? JSON.parse(raw) : [];
-      if (!Array.isArray(cart) || cart.length === 0) {
-        alert("Tu carrito está vacío");
-        navigate("/carrito");
-        return;
-      }
-      setItems(cart);
-    } catch {
-      navigate("/carrito");
-    }
-  }, [navigate]);
+    crearPedido();
+  }, [tipoEntrega]); // ✅ Recrear pedido cuando cambia tipo de entrega
 
-  useEffect(() => {
-    let active = true;
-    const mergeUserData = (data) => {
-      if (!data || !active) return;
-      const perfil = data.perfil || data.profile || {};
-      setForm((prev) => ({
-        ...prev,
-        nombre:
-          prev.nombre ||
-          data.first_name ||
-          data.nombre ||
-          perfil.nombre ||
-          data.username ||
-          "",
-        apellido:
-          prev.apellido ||
-          data.last_name ||
-          data.apellido ||
-          perfil.apellido ||
-          "",
-        email: prev.email || data.email || perfil.email || "",
-        telefono: prev.telefono || data.telefono || perfil.telefono || "",
-        direccion: prev.direccion || data.direccion || perfil.direccion || "",
-        ciudad: prev.ciudad || data.ciudad || perfil.ciudad || "",
-      }));
-    };
-
-    const storedUser =
-      (typeof authService.getClienteUser === "function" && authService.getClienteUser()) || null;
-    if (storedUser) {
-      mergeUserData(storedUser);
-    }
-
-    (async () => {
-      try {
-        if (typeof authService.getProfile === "function") {
-          const profile = await authService.getProfile(false);
-          mergeUserData(profile);
-          return;
-        }
-      } catch (error) {
-        console.warn("No se pudo obtener perfil (authService):", error);
-      }
-
-      const token = getAuthToken();
-      if (!token) return;
-      try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/auth/me/`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        mergeUserData(data);
-      } catch (error) {
-        console.warn("No se pudo obtener perfil (fetch):", error);
-      }
-    })();
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const total = useMemo(
-    () => items.reduce((s, it) => s + (it.precio || 0) * (it.cantidad || 1), 0),
-    [items]
-  );
-  const costoEnvio = useMemo(
-    () => (metodoEnvio === "envio" ? 2000 : 0),
-    [metodoEnvio]
-  );
-  const totalConEnvio = total + costoEnvio;
-
-  const onChange = (e) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const validar = () => {
-    if (!form.nombre || !form.apellido || !form.telefono || !form.email) {
-      setError("Completá todos los datos requeridos");
-      return false;
-    }
-    if (metodoEnvio === "envio") {
-      if (!form.direccion || !form.ciudad) {
-        setError("Completá la dirección de envío");
-        return false;
-      }
-    }
-    setError(null);
-    return true;
-  };
-
-  const finalizarConEfectivo = async () => {
-    if (!validar()) return;
-
+  const crearPedido = async () => {
     try {
       setLoading(true);
-      const token = getAuthToken();
-
-      const pedido = {
-        id: Date.now(),
-        fecha: new Date().toISOString(),
-        items,
-        envio: {
-          metodo: metodoEnvio,
-          datos: { ...form },
-          costo: costoEnvio,
-        },
-        pago: {
-          metodo: "efectivo",
-          estado: "pendiente",
-        },
-        total: totalConEnvio,
-      };
-
-      let storedOrder = pedido;
-
-      try {
-        const payload = {
-          items: (items || []).map((it) => ({
-            producto_id: it.id,
-            variante_id: it.variante_id || null, // ✅ AGREGADO: Incluir variante_id
-            cantidad: it.cantidad || 1,
-            precio_unitario: it.precio || 0,
-          })),
-          envio: {
-            metodo: metodoEnvio,
-            costo: costoEnvio,
-            direccion: form.direccion || null,
-            ciudad: form.ciudad || null,
-          },
-          contacto: {
-            nombre: form.nombre,
-            apellido: form.apellido,
-            telefono: form.telefono,
-            email: form.email,
-          },
-          notas: form.notas || "",
-          total: totalConEnvio,
-        };
-
-        if (!token) {
-          alert("Inicia sesión para finalizar la compra");
-          setLoading(false);
-          return;
-        }
-
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/pedidos/pedido/`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        });
-
-        if (res.ok) {
-          const created = await res.json();
-          storedOrder = created || storedOrder;
-        } else {
-          let msg = "No se pudo registrar el pedido";
-          try { 
-            const err = await res.json(); 
-            msg = err.detail || JSON.stringify(err); 
-          } catch { 
-            throw new Error("Error al procesar respuesta del servidor");
-          }
-          alert(msg);
-          setLoading(false);
-          return;
-        }
-      } catch (err) {
-        console.error("Error:", err);
-        alert("Error al procesar el pedido");
-        setLoading(false);
-        return;
-      }
-
-      localStorage.setItem("last_order", JSON.stringify(storedOrder));
-      try {
-        const rawList = localStorage.getItem("orders_local");
-        const list = rawList ? JSON.parse(rawList) : [];
-        const next = [storedOrder, ...Array.isArray(list) ? list : []];
-        localStorage.setItem("orders_local", JSON.stringify(next));
-      } catch { 
-        console.error("Error al guardar orden local");
-      }
       
-      localStorage.removeItem("cart");
-      navigate("/compra-exitosa");
-    } catch (err) {
-      console.error("Error:", err);
-      alert("No se pudo finalizar la compra");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const finalizarConMercadoPago = async () => {
-    if (!validar()) return;
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      const token = getAuthToken();
-
-      if (!token) {
-        alert("Inicia sesión para finalizar la compra");
-        setLoading(false);
+      const cartRaw = localStorage.getItem('cart');
+      const cart = cartRaw ? JSON.parse(cartRaw) : [];
+      
+      if (cart.length === 0) {
+        alert('Tu carrito está vacío');
+        navigate('/carrito');
         return;
       }
 
-      // 1. Primero crear el pedido en el backend
-      const payload = {
-        items: (items || []).map((it) => ({
-          producto_id: it.id,
-          variante_id: it.variante_id || null, // ✅ AGREGADO: Incluir variante_id
-          cantidad: it.cantidad || 1,
-          precio_unitario: it.precio || 0,
-        })),
-        envio: {
-          metodo: metodoEnvio,
-          costo: costoEnvio,
-          direccion: form.direccion || null,
-          ciudad: form.ciudad || null,
-        },
+      const token = localStorage.getItem('authToken');
+      const userRaw = localStorage.getItem('user');
+      const user = userRaw ? JSON.parse(userRaw) : {};
+      
+      const items = cart.map(item => ({
+        producto_id: item.id,
+        cantidad: item.cantidad || 1,
+        precio_unitario: item.precio
+      }));
+
+      // ✅ Calcular subtotal (sin envío)
+      const subtotal = cart.reduce((sum, it) => {
+        const precio = Number(it.precio) || 0;
+        const cantidad = Number(it.cantidad) || 1;
+        return sum + (precio * cantidad);
+      }, 0);
+
+      // ✅ Agregar costo de envío solo si es envío a domicilio
+      const costoEnvio = tipoEntrega === 'envio' ? COSTO_ENVIO : 0;
+      const total = subtotal + costoEnvio;
+
+      const pedidoPayload = {
+        items: items,
         contacto: {
-          nombre: form.nombre,
-          apellido: form.apellido,
-          telefono: form.telefono,
-          email: form.email,
+          email: user.email || 'cliente@example.com',
+          telefono: user.telefono || '3794000000'
         },
-        notas: form.notas || "",
-        total: totalConEnvio,
+        total: total,
+        envio: {
+          tipo: tipoEntrega,
+          costo: costoEnvio
+        },
+        notas: tipoEntrega === 'retiro' ? 'Retiro en local' : ''
       };
 
-      console.log("📦 Creando pedido...", payload);
+      console.log('📤 Creando pedido:', pedidoPayload);
 
-      const resPedido = await fetch(`${import.meta.env.VITE_API_URL}/pedidos/pedido/`, {
-        method: "POST",
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/pedidos/pedido/`, {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` })
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(pedidoPayload)
       });
 
-      if (!resPedido.ok) {
-        let msg = "No se pudo registrar el pedido";
-        try {
-          const err = await resPedido.json();
-          msg = err.detail || JSON.stringify(err);
-        } catch { 
-          throw new Error("Error al procesar respuesta del servidor");
-        }
-        throw new Error(msg);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Error al crear pedido');
       }
 
-      const pedido = await resPedido.json();
-      console.log("✅ Pedido creado:", pedido);
+      const pedido = await response.json();
+      console.log('✅ Pedido creado:', pedido);
 
-      // 2. Crear preferencia de pago en MercadoPago
-      const preferenceData = {
-        pedido_id: pedido.id,
-        items: items.map((it) => ({
-          title: `${it.nombre}`,
-          quantity: it.cantidad || 1,
-          unit_price: it.precio || 0,
-        })),
-        payer: {
-          name: form.nombre,
-          surname: form.apellido,
-          email: form.email,
-          phone: form.telefono,
-        },
-        frontend_url: import.meta.env.DEV 
-                ? "http://127.0.0.1:5173"
-                : window.location.origin,
-      };
+      setPedidoData(pedido);
+      localStorage.setItem('last_order', JSON.stringify(pedido));
+      
+      setLoading(false);
 
-      console.log("💳 Creando preferencia de pago...", preferenceData);
-
-      const result = await paymentsService.crearPreferencia(preferenceData);
-
-      if (!result.success) {
-        throw new Error(result.error);
-      }
-
-      console.log("✅ Preferencia creada:", result.data);
-
-      // 3. Guardar info del pedido en localStorage
-      localStorage.setItem("last_order", JSON.stringify(pedido));
-      localStorage.setItem("last_preference_id", result.data.preference_id);
-
-      // 4. Limpiar carrito
-      localStorage.removeItem("cart");
-
-      // 5. Redirigir a MercadoPago
-      const checkoutUrl = result.data.init_point || result.data.sandbox_init_point;
-
-      if (!checkoutUrl) {
-        throw new Error("No se recibió URL de pago");
-      }
-
-      console.log("🚀 Redirigiendo a MercadoPago:", checkoutUrl);
-
-      // Redirigir al usuario a MercadoPago
-      window.location.href = checkoutUrl;
-
-    } catch (err) {
-      console.error("❌ Error al procesar pago:", err);
-      setError(err.message || "Error al procesar el pago");
+    } catch (error) {
+      console.error('❌ Error creando pedido:', error);
+      setError(error.message);
       setLoading(false);
     }
   };
 
-  const handleFinalizarCompra = () => {
-    if (metodoPago === "efectivo") {
-      finalizarConEfectivo();
-    } else if (metodoPago === "mercadopago") {
-      finalizarConMercadoPago();
+  const handlePaymentSuccess = async (result) => {
+    console.log('✅ Pago exitoso:', result);
+    
+    localStorage.setItem('ultimo_pago', JSON.stringify(result));
+    localStorage.removeItem('cart');
+    
+    if (result.status === 'approved') {
+      navigate(`/compra-exitosa?payment_id=${result.payment_id}&external_reference=${pedidoData.id}`);
+    } else if (result.status === 'pending' || result.status === 'in_process') {
+      navigate(`/pago-pendiente?payment_id=${result.payment_id}&external_reference=${pedidoData.id}`);
+    } else {
+      navigate(`/pago-fallido?payment_id=${result.payment_id}&external_reference=${pedidoData.id}`);
     }
   };
 
+  const handlePaymentError = (error) => {
+    console.error('❌ Error:', error);
+    navigate(`/pago-fallido?external_reference=${pedidoData?.id}`);
+  };
+
+  // ✅ Handler para pago en el local
+  const handlePagoEnLocal = () => {
+    if (!pedidoData) return;
+    
+    // Guardar que eligió pago en local
+    localStorage.setItem('ultimo_pago', JSON.stringify({
+      payment_id: `LOCAL-${pedidoData.id}`,
+      status: 'pending',
+      payment_method_id: 'efectivo_local'
+    }));
+    
+    localStorage.removeItem('cart');
+    
+    // Redirigir a página de pendiente con mensaje especial
+    navigate(`/pago-pendiente?payment_id=LOCAL-${pedidoData.id}&external_reference=${pedidoData.id}&type=local`);
+  };
+
+  if (loading) {
+    return (
+      <div className="container min-h-screen flex items-center justify-center bg-[#F0F6F6]">
+        <div className="text-center bg-white p-10 rounded-lg shadow-lg">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-[#084B83] mx-auto mb-4"></div>
+          <p className="text-gray-600 text-lg">Preparando tu pedido...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container min-h-screen flex items-center justify-center bg-[#F0F6F6]">
+        <div className="bg-red-50 p-8 rounded-lg max-w-md shadow-lg">
+          <h2 className="text-xl font-bold text-red-800 mb-4">Error</h2>
+          <p className="text-red-600 mb-4">{error}</p>
+          <button 
+            onClick={() => navigate('/carrito')}
+            className="bg-red-600 text-white px-6 py-2 rounded-full"
+          >
+            Volver al carrito
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!pedidoData) return null;
+
+  const subtotal = pedidoData.total - (tipoEntrega === 'envio' ? COSTO_ENVIO : 0);
+
   return (
-    <section className="h-full min-h-[calc(100vh-6rem)] md:min-h-[calc(100vh-8rem)] bg-[#F0F6F6] px-8 md:px-96 py-8 md:flex md:flex-col md:justify-center">
-      <h1 className="text-2xl md:text-4xl font-bold text-[#084B83] mb-4 mt-12">
-        Checkout
-      </h1>
-
-      {/* Mostrar errores */}
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          {error}
-        </div>
-      )}
-
-      <div className="md:grid md:grid-cols-3 md:gap-12">
-        <div className="md:col-span-2">
-          {/* Método de envío */}
-          <div className="flex flex-wrap items-center gap-4 mb-4 text-sm bg-white rounded-lg p-4 py-3 border border-gray-200">
-            <label className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="metodoEnvio"
-                value="envio"
-                checked={metodoEnvio === "envio"}
-                onChange={() => setMetodoEnvio("envio")}
-              />
-              Envío a domicilio (+$2.000)
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="metodoEnvio"
-                value="retiro"
-                checked={metodoEnvio === "retiro"}
-                onChange={() => setMetodoEnvio("retiro")}
-              />
-              Retiro en local (Sin costo)
-            </label>
-          </div>
-          <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="flex flex-col">
-                <label className="text-sm font-medium text-[#084B83] mb-1">
-                  Nombre(s) *
-                </label>
-                <input
-                  name="nombre"
-                  placeholder="Ingresá tu nombre"
-                  value={form.nombre}
-                  onChange={onChange}
-                  type="text"
-                  className="w-full border border-gray-200 bg-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#084B83]"
-                  required
-                />
-              </div>
-              <div className="flex flex-col">
-                <label className="text-sm font-medium text-[#084B83] mb-1">
-                  Apellido *
-                </label>
-                <input
-                  name="apellido"
-                  placeholder="Ingresá tu apellido"
-                  value={form.apellido}
-                  onChange={onChange}
-                  type="text"
-                  className="w-full border border-gray-200 bg-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#084B83]"
-                  required
-                />
-              </div>
-            </div>
-            {metodoEnvio === "envio" && (
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="flex flex-col">
-                  <label className="text-sm font-medium text-[#084B83] mb-1">
-                    Ciudad *{" "}
-                    <span className="text-xs font-light text-gray-500">
-                      (Sólo Resistencia y Corrientes)
-                    </span>
-                  </label>
-                  <select
-                    name="ciudad"
-                    value={form.ciudad}
-                    onChange={onChange}
-                    className="w-full border border-gray-200 bg-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#084B83]"
-                    required
-                  >
-                    <option value="">Seleccionar ciudad</option>
-                    <option value="Resistencia">Resistencia</option>
-                    <option value="Corrientes">Corrientes</option>
-                  </select>
-                </div>
-                <div className="flex flex-col">
-                  <label className="text-sm font-medium text-[#084B83] mb-1">
-                    Dirección *
-                  </label>
-                  <input
-                    name="direccion"
-                    placeholder="¿A dónde te lo enviamos?"
-                    value={form.direccion}
-                    onChange={onChange}
-                    type="text"
-                    className="w-full border border-gray-200 bg-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#084B83]"
-                    required
-                  />
-                </div>
-              </div>
-            )}
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="flex flex-col">
-                <label className="text-sm font-medium text-[#084B83] mb-1">
-                  Teléfono *
-                </label>
-                <input
-                  name="telefono"
-                  placeholder="Ingresá tu número telefónico"
-                  value={form.telefono}
-                  onChange={onChange}
-                  type="text"
-                  className="w-full border border-gray-200 bg-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#084B83]"
-                  required
-                />
-              </div>
-              <div className="flex flex-col">
-                <label className="text-sm font-medium text-[#084B83] mb-1">
-                  Correo electrónico *
-                </label>
-                <input
-                  name="email"
-                  placeholder="Ingresá tu e-mail"
-                  value={form.email}
-                  onChange={onChange}
-                  type="email"
-                  className="w-full border border-gray-200 bg-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#084B83]"
-                  required
-                />
-              </div>
+    <section className="min-h-screen bg-[#F0F6F6] px-6 md:px-20 py-10">
+      <div className="max-w-4xl mx-auto">
+        <h1 className="text-3xl font-bold text-[#084B83] mb-8">Finalizar Compra</h1>
+        
+        <div className="grid md:grid-cols-2 gap-8">
+          {/* Resumen del pedido */}
+          <div className="bg-white shadow-lg rounded-lg p-6">
+            <h3 className="text-xl font-bold mb-4 text-[#2F4858]">Resumen del pedido</h3>
+            
+            <div className="bg-gray-50 rounded p-3 mb-4">
+              <p className="text-sm text-gray-600">Número de pedido:</p>
+              <p className="font-semibold text-[#084B83]">{pedidoData.numero_pedido}</p>
             </div>
 
-            <div className="flex flex-col">
-              <label className="text-sm font-medium text-[#084B83] mb-1">
-                Notas
-              </label>
-              <input
-                placeholder="(Opcional)"
-                name="notas"
-                value={form.notas}
-                onChange={onChange}
-                type="text"
-                className="w-full border border-gray-200 bg-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#084B83]"
-              />
-            </div>
-          </form>
-        </div>
-
-        <aside className="md:col-span-1 md:flex md:flex-col md:justify-center mb-8 md:mb-0">
-          <h2 className="text-xl md:text-2xl font-semibold mb-4 mt-8 md:mt-0 text-[#084B83]">
-            Resumen del pedido
-          </h2>
-          <div className="border rounded-lg p-4 bg-white">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm table-auto whitespace-nowrap md:whitespace-normal">
-                <thead>
-                  <tr className="text-gray-500">
-                    <th className="text-left pb-2">Producto</th>
-                    <th className="text-right pb-2">Cant.</th>
-                    <th className="text-right pb-2">Subtotal</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((it) => (
-                    <tr key={`${it.id}-${it.variante_id || ""}`} className="border-t">
-                      <td className="py-2 max-w-[10rem]">
-                        <div className="truncate font-medium">{it.nombre}</div>
-                        {(it.color || it.talla) && (
-                          <div className="text-xs text-gray-500 flex flex-col">
-                            {it.color ? <span>Color: {it.color}</span> : null}
-                            {it.talla ? <span>Talle: {it.talla}</span> : null}
-                          </div>
-                        )}
-                      </td>
-                      <td className="py-2 text-right">{it.cantidad || 1}</td>
-                      <td className="py-2 text-right">
-                        ${Number((it.precio || 0) * (it.cantidad || 1)).toLocaleString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="border-t">
-                    <td className="pt-3 text-gray-600">Productos</td>
-                    <td></td>
-                    <td className="pt-3 text-right font-semibold">
-                      ${Number(total).toLocaleString()}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="pt-1 text-gray-600">Envío</td>
-                    <td></td>
-                    <td className="pt-1 text-right font-semibold">
-                      ${Number(costoEnvio).toLocaleString()}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="pt-2 font-semibold">Total</td>
-                    <td></td>
-                    <td className="pt-2 text-right text-lg font-bold">
-                      ${Number(totalConEnvio).toLocaleString()}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </div>
-          <div className="mb-4 bg-white rounded-lg p-4 border border-gray-200 mt-4">
-            <h3 className="font-semibold text-[#084B83] mb-3">Método de pago</h3>
-            <div className="space-y-3">
-              <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition">
-                <input
-                  type="radio"
-                  name="metodoPago"
-                  value="mercadopago"
-                  checked={metodoPago === "mercadopago"}
-                  onChange={() => setMetodoPago("mercadopago")}
-                  className="w-4 h-4"
-                />
-                <div className="flex items-center gap-2">
-                  <img
-                    src="https://logowik.com/content/uploads/images/mercado-pago3162.logowik.com.webp"
-                    alt="MercadoPago"
-                    className="h-6"
+            {/* ✅ Selector de tipo de entrega */}
+            <div className="mb-6 border rounded-lg p-4 bg-blue-50">
+              <h4 className="font-semibold mb-3">Tipo de entrega:</h4>
+              <div className="space-y-2">
+                <label className="flex items-center cursor-pointer">
+                  <input 
+                    type="radio" 
+                    name="entrega" 
+                    value="envio"
+                    checked={tipoEntrega === 'envio'}
+                    onChange={(e) => setTipoEntrega(e.target.value)}
+                    className="mr-3"
                   />
                   <div>
-                    <p className="font-medium">Mercado Pago</p>
+                    <div className="font-medium">Envío a domicilio (+${COSTO_ENVIO.toLocaleString()})</div>
+                    <div className="text-xs text-gray-600">Recibilo en tu casa</div>
                   </div>
-                </div>
-              </label>
+                </label>
+                
+                <label className="flex items-center cursor-pointer">
+                  <input 
+                    type="radio" 
+                    name="entrega" 
+                    value="retiro"
+                    checked={tipoEntrega === 'retiro'}
+                    onChange={(e) => setTipoEntrega(e.target.value)}
+                    className="mr-3"
+                  />
+                  <div>
+                    <div className="font-medium">Retiro en el local (Gratis)</div>
+                    <div className="text-xs text-gray-600">Pasá a buscar tu pedido</div>
+                  </div>
+                </label>
+              </div>
+            </div>
+            
+            <div className="border-t pt-4">
+              <h4 className="font-semibold mb-3 text-gray-700">Productos:</h4>
+              <div className="space-y-2">
+                {pedidoData.items?.map((item, idx) => (
+                  <div key={idx} className="flex justify-between text-sm">
+                    <span className="text-gray-600">
+                      {item.cantidad}x {item.nombre_producto}
+                    </span>
+                    <span className="font-semibold">
+                      ${Number(item.subtotal).toLocaleString()}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            {/* ✅ Mostrar desglose de costos */}
+            <div className="border-t pt-4 mt-4 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Subtotal:</span>
+                <span className="font-semibold">${subtotal.toLocaleString()}</span>
+              </div>
+              
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Envío:</span>
+                <span className="font-semibold">
+                  {tipoEntrega === 'retiro' ? 'Gratis' : `$${COSTO_ENVIO.toLocaleString()}`}
+                </span>
+              </div>
+              
+              <div className="flex justify-between items-center border-t pt-2">
+                <span className="text-lg font-bold">Total:</span>
+                <span className="text-2xl font-bold text-[#084B83]">
+                  ${Number(pedidoData.total).toLocaleString()}
+                </span>
+              </div>
             </div>
           </div>
-          <button
-            onClick={handleFinalizarCompra}
-            disabled={loading}
-            className={`w-full uppercase bg-[#084B83] text-white px-8 py-3 rounded-full font-semibold text-sm hover:scale-[1.02] transition-transform duration-200 ${loading ? "opacity-50 cursor-not-allowed" : ""
-              }`}
-          >
-            {loading ? "Procesando..." : "Finalizar compra"}
-          </button>
-        </aside>
+
+          {/* Payment Brick y opciones de pago */}
+          <div className="bg-white shadow-lg rounded-lg p-6">
+            <h3 className="text-xl font-bold mb-4 text-[#2F4858]">Método de pago</h3>
+            
+            {/* ✅ Opción de pago en el local */}
+            <div className="mb-6 border-2 border-[#084B83] rounded-lg p-4 bg-blue-50">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <div className="font-bold text-[#084B83]">💵 Pagar en el local</div>
+                  <div className="text-sm text-gray-600">Abonás cuando retirás tu pedido</div>
+                </div>
+              </div>
+              <button
+                onClick={handlePagoEnLocal}
+                className="w-full bg-[#084B83] text-white px-6 py-3 rounded-full hover:bg-[#063d6b] transition font-semibold"
+              >
+                Confirmar pedido - Pago en local
+              </button>
+            </div>
+
+            <div className="relative mb-4">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-gray-500">o pagá online</span>
+              </div>
+            </div>
+
+            {/* Payment Brick */}
+            <PaymentBrick
+              pedidoId={pedidoData.id}
+              amount={pedidoData.total}
+              description={`Pedido ${pedidoData.numero_pedido} - Ambos Norte`}
+              onPaymentSuccess={handlePaymentSuccess}
+              onPaymentError={handlePaymentError}
+            />
+          </div>
+        </div>
       </div>
     </section>
   );
