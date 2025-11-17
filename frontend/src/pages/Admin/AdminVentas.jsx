@@ -14,7 +14,7 @@ import {
   Filler,
 } from 'chart.js';
 import AdminSidebar from '../../components/admin/AdminSidebar';
-import KPICard from '../../components/admin/KpiCard';
+import KPICard from '../../components/admin/Kpicard';
 import ChartCard from '../../components/admin/Chartcard';
 import analyticsService from '../../services/analytics';
 import paymentsService from '../../services/payments';
@@ -36,6 +36,7 @@ ChartJS.register(
 );
 
 export default function AdminVentas() {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [pagos, setPagos] = useState([]);
   const [pagosFiltrados, setPagosFiltrados] = useState([]);
@@ -522,11 +523,11 @@ export default function AdminVentas() {
   if (loading) {
     return (
       <div className="flex h-screen">
-        <AdminSidebar />
-        <div className="flex-1 flex items-center justify-center">
+        <AdminSidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
+        <div className="flex-1 flex items-center justify-center p-4">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Cargando datos de ventas...</p>
+            <div className="animate-spin rounded-full h-24 w-24 sm:h-32 sm:w-32 border-b-2 border-indigo-600 mx-auto"></div>
+            <p className="mt-4 text-sm sm:text-base text-gray-600">Cargando datos de ventas...</p>
           </div>
         </div>
       </div>
@@ -535,27 +536,35 @@ export default function AdminVentas() {
 
   return (
     <div className="flex min-h-screen bg-gray-50">
-      <AdminSidebar />
+      <AdminSidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
 
-      <main className="flex-1 p-8">
+      {/* Botón hamburguesa para móvil */}
+      <button
+        onClick={() => setSidebarOpen(true)}
+        className="lg:hidden fixed top-4 left-4 z-40 p-2 rounded-md bg-indigo-600 text-white shadow-lg hover:bg-indigo-700 transition-colors"
+      >
+        <i className="fas fa-bars text-xl"></i>
+      </button>
+
+      <main className="flex-1 p-4 sm:p-6 lg:p-8 lg:ml-0">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Panel de Ventas</h1>
-          <p className="mt-1 text-sm text-gray-600">
+        <div className="mb-6 sm:mb-8 mt-12 lg:mt-0">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Panel de Ventas</h1>
+          <p className="mt-1 text-xs sm:text-sm text-gray-600">
             Análisis completo de ventas y pagos
           </p>
         </div>
 
         {/* Filtros Avanzados (solo fechas y estado) */}
-        <div className="bg-white shadow-lg rounded-lg p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">
+        <div className="bg-white shadow-lg rounded-lg p-4 sm:p-6 mb-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-2">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900">
               <i className="fas fa-filter mr-2 text-indigo-600"></i>
               Filtros
             </h3>
             <button
               onClick={limpiarFiltros}
-              className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+              className="text-xs sm:text-sm text-indigo-600 hover:text-indigo-800 font-medium"
             >
               <i className="fas fa-redo mr-1"></i>
               Limpiar filtros
@@ -563,22 +572,22 @@ export default function AdminVentas() {
           </div>
 
           {/* Rangos predefinidos */}
-          <div className="mb-4 flex gap-2">
+          <div className="mb-4 flex flex-wrap gap-2">
             <button
               onClick={() => establecerRangoPredef(7)}
-              className="px-3 py-1.5 text-sm bg-indigo-100 text-indigo-700 rounded-md hover:bg-indigo-200"
+              className="px-3 py-1.5 text-xs sm:text-sm bg-indigo-100 text-indigo-700 rounded-md hover:bg-indigo-200"
             >
               Últimos 7 días
             </button>
             <button
               onClick={() => establecerRangoPredef(30)}
-              className="px-3 py-1.5 text-sm bg-indigo-100 text-indigo-700 rounded-md hover:bg-indigo-200"
+              className="px-3 py-1.5 text-xs sm:text-sm bg-indigo-100 text-indigo-700 rounded-md hover:bg-indigo-200"
             >
               Últimos 30 días
             </button>
             <button
               onClick={() => establecerRangoPredef(90)}
-              className="px-3 py-1.5 text-sm bg-indigo-100 text-indigo-700 rounded-md hover:bg-indigo-200"
+              className="px-3 py-1.5 text-xs sm:text-sm bg-indigo-100 text-indigo-700 rounded-md hover:bg-indigo-200"
             >
               Últimos 90 días
             </button>
@@ -587,7 +596,7 @@ export default function AdminVentas() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* Fecha Desde */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                 <i className="fas fa-calendar mr-2"></i>
                 Desde
               </label>
@@ -595,13 +604,13 @@ export default function AdminVentas() {
                 type="date"
                 value={fechaDesde}
                 onChange={(e) => setFechaDesde(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               />
             </div>
 
             {/* Fecha Hasta */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                 <i className="fas fa-calendar mr-2"></i>
                 Hasta
               </label>
@@ -609,20 +618,20 @@ export default function AdminVentas() {
                 type="date"
                 value={fechaHasta}
                 onChange={(e) => setFechaHasta(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               />
             </div>
 
             {/* Estado */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                 <i className="fas fa-check-circle mr-2"></i>
                 Estado
               </label>
               <select
                 value={filtroEstado}
                 onChange={(e) => setFiltroEstado(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               >
                 <option value="todos">Todos</option>
                 <option value="aprobado">Aprobado</option>
@@ -633,14 +642,14 @@ export default function AdminVentas() {
           </div>
 
           {/* Contador de resultados */}
-          <div className="mt-4 text-sm text-gray-600">
+          <div className="mt-4 text-xs sm:text-sm text-gray-600">
             Mostrando <span className="font-semibold">{pagosFiltrados.length}</span> de{' '}
             <span className="font-semibold">{pagos.length}</span> pagos
           </div>
         </div>
 
         {/* KPIs */}
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+        <div className="grid grid-cols-1 gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-6 sm:mb-8">
           <KPICard
             title="Ventas Totales"
             value={`$${kpis.totalVentas.toLocaleString()}`}
@@ -668,24 +677,24 @@ export default function AdminVentas() {
         </div>
 
         {/* Gráficos */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 mb-6 sm:mb-8">
           {/* Gráfico de Ventas por Día */}
           <ChartCard title="Evolución de Ventas" icon="fas fa-chart-line">
-            <div className="relative" style={{ height: '300px' }}>
+            <div className="relative" style={{ height: '250px', minHeight: '250px' }}>
               <Line data={ventasChartData} options={ventasChartOptions} />
             </div>
           </ChartCard>
 
           {/* Gráfico de Categorías Vendidas (PORCENTAJES) */}
           <ChartCard title="Distribución de Ventas por Categoría (%)" icon="fas fa-chart-pie">
-            <div className="relative" style={{ height: '300px' }}>
+            <div className="relative" style={{ height: '250px', minHeight: '250px' }}>
               {categoriasVendidas.length > 0 ? (
                 <Doughnut data={categoriasChartData} options={categoriasChartOptions} />
               ) : (
                 <div className="flex items-center justify-center h-full text-gray-500">
                   <div className="text-center">
-                    <i className="fas fa-chart-pie text-4xl mb-2 opacity-50"></i>
-                    <p className="text-sm">No hay datos para mostrar en el período seleccionado</p>
+                    <i className="fas fa-chart-pie text-3xl sm:text-4xl mb-2 opacity-50"></i>
+                    <p className="text-xs sm:text-sm">No hay datos para mostrar en el período seleccionado</p>
                   </div>
                 </div>
               )}
@@ -694,16 +703,16 @@ export default function AdminVentas() {
         </div>
 
         {/* Gráfico de Barras de Categorías */}
-        <div className="mb-8">
+        <div className="mb-6 sm:mb-8">
           <ChartCard title="Ventas por Categoría" icon="fas fa-chart-bar">
-            <div className="relative" style={{ height: '350px' }}>
+            <div className="relative" style={{ height: '300px', minHeight: '300px' }}>
               {categoriasVendidas.length > 0 ? (
                 <Bar data={categoriasBarrasChartData} options={categoriasBarrasChartOptions} />
               ) : (
                 <div className="flex items-center justify-center h-full text-gray-500">
                   <div className="text-center">
-                    <i className="fas fa-chart-bar text-4xl mb-2 opacity-50"></i>
-                    <p className="text-sm">No hay datos para mostrar en el período seleccionado</p>
+                    <i className="fas fa-chart-bar text-3xl sm:text-4xl mb-2 opacity-50"></i>
+                    <p className="text-xs sm:text-sm">No hay datos para mostrar en el período seleccionado</p>
                   </div>
                 </div>
               )}
@@ -713,8 +722,8 @@ export default function AdminVentas() {
 
         {/* Tabla de Pagos con filtros integrados */}
         <div className="bg-white shadow-lg rounded-lg overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">
               <i className="fas fa-table mr-2 text-indigo-600"></i>
               Detalle de Pagos
             </h3>
@@ -723,7 +732,7 @@ export default function AdminVentas() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Pedido */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                   <i className="fas fa-shopping-bag mr-2"></i>
                   Buscar por Pedido ID
                 </label>
@@ -732,13 +741,13 @@ export default function AdminVentas() {
                   placeholder="Buscar por ID de pedido..."
                   value={filtroPedido}
                   onChange={(e) => setFiltroPedido(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 />
               </div>
 
               {/* Cliente */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                   <i className="fas fa-user mr-2"></i>
                   Buscar por Cliente
                 </label>
@@ -747,38 +756,38 @@ export default function AdminVentas() {
                   placeholder="Buscar por nombre o email..."
                   value={filtroCliente}
                   onChange={(e) => setFiltroCliente(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 />
               </div>
             </div>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
+            <table className="min-w-full divide-y divide-gray-200" style={{ minWidth: '800px' }}>
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     ID
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Fecha
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Cliente
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Pedido
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Monto
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Estado
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Método
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Acciones
                   </th>
                 </tr>
@@ -787,39 +796,39 @@ export default function AdminVentas() {
                 {pagosFiltrados.length > 0 ? (
                   pagosFiltrados.map((pago) => (
                     <tr key={pago.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-gray-900">
                         #{pago.id}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-700">
                         {new Date(pago.fecha_pago || pago.fecha_creacion).toLocaleDateString('es-AR')}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-700">
+                      <td className="px-3 sm:px-6 py-4 text-xs sm:text-sm text-gray-700">
                         <div>
                           <div className="font-medium">{pago.cliente_nombre || 'Sin nombre'}</div>
-                          <div className="text-xs text-gray-500">{pago.cliente_email || 'Sin email'}</div>
+                          <div className="text-xs text-gray-500 truncate max-w-[150px]">{pago.cliente_email || 'Sin email'}</div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-700">
                         #{typeof pago.pedido === 'number' ? pago.pedido : pago.pedido?.id || 'N/A'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm font-semibold text-gray-900">
                         ${parseFloat(pago.monto || 0).toLocaleString()}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getEstadoBadge(pago.estado_pago)}`}>
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 sm:px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getEstadoBadge(pago.estado_pago)}`}>
                           {getEstadoTexto(pago.estado_pago)}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-700">
                         {pago.metodo_pago || 'MercadoPago'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm">
                         <button
                           onClick={() => abrirModalEdicion(pago)}
                           className="text-indigo-600 hover:text-indigo-900 font-medium"
                         >
                           <i className="fas fa-edit mr-1"></i>
-                          Editar
+                          <span className="hidden sm:inline">Editar</span>
                         </button>
                       </td>
                     </tr>
@@ -828,8 +837,8 @@ export default function AdminVentas() {
                   <tr>
                     <td colSpan="8" className="px-6 py-8 text-center">
                       <div className="text-gray-500">
-                        <i className="fas fa-inbox text-4xl mb-2"></i>
-                        <p className="text-sm">No se encontraron pagos con los filtros aplicados</p>
+                        <i className="fas fa-inbox text-3xl sm:text-4xl mb-2"></i>
+                        <p className="text-xs sm:text-sm">No se encontraron pagos con los filtros aplicados</p>
                       </div>
                     </td>
                   </tr>
@@ -842,14 +851,14 @@ export default function AdminVentas() {
 
       {/* Modal de Edición */}
       {pagoEditando && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-0 sm:p-4">
+          <div className="bg-white rounded-none sm:rounded-lg shadow-xl p-4 sm:p-6 w-full h-full sm:h-auto sm:max-w-md">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">
               Editar Estado del Pago #{pagoEditando.id}
             </h3>
             
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                 Estado Actual: <span className={`px-2 py-1 rounded text-xs font-semibold ${getEstadoBadge(pagoEditando.estado_pago)}`}>
                   {getEstadoTexto(pagoEditando.estado_pago)}
                 </span>
@@ -857,13 +866,13 @@ export default function AdminVentas() {
             </div>
 
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                 Nuevo Estado
               </label>
               <select
                 value={nuevoEstado}
                 onChange={(e) => setNuevoEstado(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               >
                 <option value="aprobado">Aprobado</option>
                 <option value="pendiente">Pendiente</option>
@@ -874,13 +883,13 @@ export default function AdminVentas() {
             <div className="flex gap-3">
               <button
                 onClick={cambiarEstadoPago}
-                className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 font-medium"
+                className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 font-medium text-sm sm:text-base"
               >
                 Guardar
               </button>
               <button
                 onClick={cerrarModalEdicion}
-                className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 font-medium"
+                className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 font-medium text-sm sm:text-base"
               >
                 Cancelar
               </button>
