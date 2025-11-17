@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from django.utils import timezone
 from .models import Pago
 from .serializer import PagoSerializer
-from apps.pedidos.models import Pedido
+from apps.pedidos.models import Pedido, HistorialEstadoPedido
 
 class PagoViewSet(viewsets.ModelViewSet):
     """
@@ -54,22 +54,27 @@ def confirmar_pago_mp(request):
         payment_id = request.data.get('payment_id')
         mp_status = request.data.get('status')
         
+        print(f"📥 Recibido pago de Express: pedido_id={pedido_id}, payment_id={payment_id}, status={mp_status}")
+        
+        # Validar datos requeridos
         if not all([pedido_id, payment_id, mp_status]):
             return Response({
                 'success': False,
-                'error': 'Faltan datos requeridos'
+                'error': 'Faltan datos requeridos (pedido_id, payment_id, status)'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Verificar que el pedido existe
+        # Buscar el pedido
         try:
             pedido = Pedido.objects.get(id=pedido_id)
+            print(f"✅ Pedido encontrado: {pedido.numero_pedido}")
         except Pedido.DoesNotExist:
+            print(f"❌ Pedido {pedido_id} no encontrado")
             return Response({
                 'success': False,
-                'error': 'Pedido no encontrado'
+                'error': f'Pedido con ID {pedido_id} no encontrado'
             }, status=status.HTTP_404_NOT_FOUND)
         
-        # Mapear estados de MP a nuestros estados
+        # Mapear estados de MercadoPago a nuestros estados
         estado_mapping = {
             'approved': 'aprobado',
             'pending': 'pendiente',
@@ -98,19 +103,38 @@ def confirmar_pago_mp(request):
             }
         )
         
+        action_text = "creado" if created else "actualizado"
+        print(f"✅ Pago {action_text}: ID={pago.id}, Estado={estado_pago}")
+        
         # Si el pago fue aprobado, actualizar estado del pedido
         if estado_pago == 'aprobado':
-            pedido.estado = 'pagado'
+            estado_anterior = pedido.estado
+            pedido.estado = 'en_preparacion'
             pedido.save()
+            
+            print(f"✅ Pedido actualizado: {estado_anterior} → en_preparacion")
+            
+            # Registrar en historial
+            HistorialEstadoPedido.objects.create(
+                pedido=pedido,
+                estado_anterior=estado_anterior,
+                estado_nuevo='en_preparacion',
+                usuario_modificador=None,  # Sistema automático
+                comentario=f'Pago aprobado automáticamente - Payment ID: {payment_id}'
+            )
         
         return Response({
             'success': True,
             'pago_id': pago.id,
             'created': created,
-            'estado': estado_pago
+            'estado': estado_pago,
+            'pedido_actualizado': pedido.estado if estado_pago == 'aprobado' else None
         }, status=status.HTTP_200_OK)
         
     except Exception as e:
+        print(f"❌ Error en confirmar_pago_mp: {str(e)}")
+        import traceback
+        print(f"📋 Traceback:\n{traceback.format_exc()}")
         return Response({
             'success': False,
             'error': str(e)
@@ -121,6 +145,7 @@ def confirmar_pago_mp(request):
 def verificar_pago(request, payment_id):
     """
     Verificar el estado de un pago por payment_id
+    GET /api/pagos/verificar/{payment_id}/
     """
     try:
         pago = Pago.objects.get(payment_id=payment_id)

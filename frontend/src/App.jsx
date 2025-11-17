@@ -27,6 +27,7 @@ import AdminSearchInsights from "./pages/Admin/AdminGoogle.jsx";
 function Layout() {
   const location = useLocation();
   const isAdmin = location.pathname.startsWith("/admin");
+  
   if (isAdmin) {
     return (
       <Routes>
@@ -95,9 +96,9 @@ function Layout() {
   }
 
   return (
-    <div className={`flex flex-col min-h-screen`}>
+    <div className="flex flex-col min-h-screen">
       <Navbar />
-      <main className={`flex-grow`}>
+      <main className="flex-grow">
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/registro" element={<Registro />} />
@@ -105,9 +106,12 @@ function Layout() {
           <Route path="/producto/:id" element={<Producto />} />
           <Route path="/carrito" element={<Carrito />} />
           <Route path="/enviopago" element={<EnvioPago />} />
+          
+          {/* ✅ Rutas de resultado de pago */}
           <Route path="/compra-exitosa" element={<CompraExitosa />} />
           <Route path="/pago-fallido" element={<PagoFallido />} />
           <Route path="/pago-pendiente" element={<PagoPendiente />} />
+          
           <Route path="/contacto" element={<Contacto />} />
           <Route
             path="/perfil"
@@ -119,7 +123,7 @@ function Layout() {
           />
         </Routes>
       </main>
-      <Footer/>
+      <Footer />
     </div>
   );
 }
