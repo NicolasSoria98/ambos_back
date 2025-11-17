@@ -159,3 +159,245 @@ def verificar_pago(request, payment_id):
             'success': False,
             'error': 'Pago no encontrado'
         }, status=status.HTTP_404_NOT_FOUND)
+        Documentación: https://www.mercadopago.com.ar/developers/es/docs/your-integrations/notifications/webhooks
+        """
+        try:
+            print("\n🔔 === WEBHOOK RECIBIDO DE MERCADOPAGO ===")
+            print(f"📦 Body: {request.body.decode('utf-8')}")
+            print(f"📋 Query params: {request.query_params}")
+            print(f"📨 Headers: {dict(request.headers)}")
+            
+            # MercadoPago puede enviar notificaciones de dos formas:
+            # 1. Como query params: ?topic=payment&id=123456
+            # 2. Como body JSON: {"action": "payment.created", "data": {"id": "123456"}}
+            
+            # Intentar obtener datos desde query params
+            topic = request.query_params.get('topic') or request.query_params.get('type')
+            resource_id = request.query_params.get('id')
+            
+            # Si no están en query params, buscar en el body
+            if not topic or not resource_id:
+                try:
+                    data = json.loads(request.body.decode('utf-8'))
+                    topic = data.get('type') or data.get('topic')
+                    resource_id = data.get('data', {}).get('id')
+                except:
+                    pass
+            
+            print(f"🔍 Topic: {topic}, Resource ID: {resource_id}")
+            
+            # Solo procesamos notificaciones de tipo 'payment'
+            if topic == 'payment' and resource_id:
+                print(f"💳 Procesando pago con ID: {resource_id}")
+                
+                # ✅ OBTENER INFO DEL PAGO CON MANEJO DE ERRORES
+                try:
+                    payment_info = sdk.payment().get(resource_id)
+                    
+                    if payment_info.get('status') != 200:
+                        print(f"❌ Error obteniendo pago de MP: {payment_info}")
+                        return Response({'status': 'error getting payment'}, status=status.HTTP_200_OK)
+                    
+                    payment = payment_info["response"]
+                    print(f"📄 Info del pago: {json.dumps(payment, indent=2, default=str)}")
+                    
+                except Exception as sdk_error:
+                    print(f"❌ Error en SDK al obtener pago: {str(sdk_error)}")
+                    return Response({'status': 'sdk error'}, status=status.HTTP_200_OK)
+                
+                # Obtener el pedido desde external_reference
+                external_reference = payment.get('external_reference')
+                
+                if not external_reference:
+                    print("⚠️ No se encontró external_reference en el pago")
+                    return Response({'status': 'no external reference'}, status=status.HTTP_200_OK)
+                
+                try:
+                    pedido = Pedido.objects.get(id=external_reference)
+                    print(f"✅ Pedido encontrado: {pedido.numero_pedido}")
+                except Pedido.DoesNotExist:
+                    print(f"❌ Pedido {external_reference} no encontrado")
+                    return Response({'status': 'pedido not found'}, status=status.HTTP_404_NOT_FOUND)
+                
+                # Buscar o crear el registro de pago
+                pago, created = Pago.objects.get_or_create(
+                    payment_id=str(resource_id),
+                    defaults={
+                        'pedido': pedido,
+                        'numero_pedido': pedido.numero_pedido,
+                        'monto': Decimal(str(payment.get('transaction_amount', 0))),
+                        'metodo_pago': 'mercadopago',
+                        'estado_pago': 'pendiente'
+                    }
+                )
+                
+                if created:
+                    print(f"✨ Nuevo pago creado: ID {pago.id}")
+                else:
+                    print(f"📝 Actualizando pago existente: ID {pago.id}")
+                
+                # Mapear estado de MercadoPago a nuestro sistema
+                mp_status = payment.get('status')
+                estado_map = {
+                    'approved': 'aprobado',
+                    'pending': 'pendiente',
+                    'in_process': 'en_proceso',
+                    'rejected': 'rechazado',
+                    'cancelled': 'cancelado',
+                    'refunded': 'devuelto',
+                    'in_mediation': 'en_mediacion'
+                }
+                
+                nuevo_estado = estado_map.get(mp_status, 'pendiente')
+                print(f"🔄 Estado MP: {mp_status} -> Nuestro estado: {nuevo_estado}")
+                
+                # Actualizar información del pago
+                estado_anterior = pago.estado_pago
+                pago.estado_pago = nuevo_estado
+                pago.payment_id = str(resource_id)
+                pago.merchant_order_id = str(payment.get('order', {}).get('id', ''))
+                pago.tipo_pago = payment.get('payment_type_id', '')
+                pago.status_detail = payment.get('status_detail', '')
+                pago.cuotas = payment.get('installments', 1)
+                
+                if mp_status == 'approved':
+                    pago.fecha_pago = datetime.now()
+                
+                pago.save()
+                print(f"💾 Pago actualizado: {estado_anterior} -> {nuevo_estado}")
+                
+                # Actualizar estado del pedido según el pago
+                if nuevo_estado == 'aprobado':
+                    # Pago aprobado -> cambiar pedido a "en_preparacion" si no lo está
+                    if pedido.estado != 'en_preparacion':
+                        pedido.estado = 'en_preparacion'
+                        pedido.save()
+                        
+                        # Registrar en historial
+                        HistorialEstadoPedido.objects.create(
+                            pedido=pedido,
+                            estado_anterior='pendiente',
+                            estado_nuevo='en_preparacion',
+                            comentario=f'Pago aprobado - ID: {resource_id}'
+                        )
+                        print(f"✅ Pedido actualizado a 'en_preparacion'")
+                
+                elif nuevo_estado in ['rechazado', 'cancelado']:
+                    # Pago rechazado/cancelado -> marcar pedido como cancelado
+                    if pedido.estado != 'cancelado':
+                        pedido.estado = 'cancelado'
+                        pedido.activo = False
+                        pedido.save()
+                        
+                        # Registrar en historial
+                        HistorialEstadoPedido.objects.create(
+                            pedido=pedido,
+                            estado_anterior=estado_anterior,
+                            estado_nuevo='cancelado',
+                            comentario=f'Pago {nuevo_estado} - ID: {resource_id}'
+                        )
+                        print(f"❌ Pedido cancelado por pago {nuevo_estado}")
+                
+                print("✅ Webhook procesado exitosamente")
+                return Response({'status': 'success'}, status=status.HTTP_200_OK)
+            
+            else:
+                print(f"ℹ️ Notificación ignorada. Topic: {topic}")
+                return Response({'status': 'ignored'}, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            print(f"❌ Error en webhook: {str(e)}")
+            print(f"📋 Traceback completo:")
+            print(traceback.format_exc())
+            # Devolver 200 para que MP no reintente la notificación
+            return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_200_OK)
+    @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated, IsAdminUser])
+    def cambiar_estado(self, request, pk=None):
+        """
+        Permite al admin cambiar manualmente el estado de un pago
+        SOLO entre: aprobado, pendiente, cancelado
+        
+        PATCH /api/pagos/pago/{id}/cambiar_estado/
+        
+        Body:
+        {
+            "estado": "aprobado" | "pendiente" | "cancelado"
+        }
+        """
+        try:
+            pago = self.get_object()
+            nuevo_estado = request.data.get('estado')
+            
+            # Validar que el estado sea válido - SOLO aprobado, pendiente, cancelado
+            estados_validos = ['aprobado', 'pendiente', 'cancelado']
+            
+            if not nuevo_estado:
+                return Response({
+                    'success': False,
+                    'error': 'El campo estado es requerido'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            if nuevo_estado not in estados_validos:
+                return Response({
+                    'success': False,
+                    'error': f'Estado inválido. Opciones válidas: {", ".join(estados_validos)}'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Guardar estado anterior
+            estado_anterior = pago.estado_pago
+            
+            # Actualizar estado
+            pago.estado_pago = nuevo_estado
+            
+            # Si se aprueba manualmente, registrar fecha de pago
+            if nuevo_estado == 'aprobado' and not pago.fecha_pago:
+                pago.fecha_pago = datetime.now()
+            
+            pago.save()
+            
+            print(f"✅ Estado de pago #{pago.id} cambiado: {estado_anterior} -> {nuevo_estado} (por admin)")
+            
+            # Actualizar estado del pedido si es necesario
+            if pago.pedido:
+                pedido = pago.pedido
+                
+                if nuevo_estado == 'aprobado' and pedido.estado == 'pendiente':
+                    pedido.estado = 'en_preparacion'
+                    pedido.save()
+                    
+                    HistorialEstadoPedido.objects.create(
+                        pedido=pedido,
+                        estado_anterior='pendiente',
+                        estado_nuevo='en_preparacion',
+                        comentario=f'Pago aprobado manualmente por admin - Pago ID: {pago.id}'
+                    )
+                    print(f"✅ Pedido #{pedido.id} actualizado a 'en_preparacion'")
+                
+                elif nuevo_estado == 'cancelado':
+                    if pedido.estado != 'cancelado':
+                        pedido.estado = 'cancelado'
+                        pedido.activo = False
+                        pedido.save()
+                        
+                        HistorialEstadoPedido.objects.create(
+                            pedido=pedido,
+                            estado_anterior=estado_anterior,
+                            estado_nuevo='cancelado',
+                            comentario=f'Pago cancelado manualmente por admin - Pago ID: {pago.id}'
+                        )
+                        print(f"❌ Pedido #{pedido.id} cancelado")
+            
+            serializer = self.get_serializer(pago)
+            return Response({
+                'success': True,
+                'message': f'Estado actualizado de {estado_anterior} a {nuevo_estado}',
+                'pago': serializer.data
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            print(f"❌ Error cambiando estado de pago: {str(e)}")
+            print(traceback.format_exc())
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

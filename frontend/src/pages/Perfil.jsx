@@ -4,6 +4,22 @@ import { User, Lock, Package } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import authService from "../services/auth";
 
+const getAuthToken = () => {
+  const clientToken = authService.getClienteToken();
+  if (clientToken) return clientToken;
+
+  const adminToken = authService.getAdminToken();
+  if (adminToken) return adminToken;
+
+  return (
+    localStorage.getItem("client_authToken") ||
+    localStorage.getItem("admin_authToken") ||
+    localStorage.getItem("clientAuthToken") ||
+    localStorage.getItem("authToken") ||
+    null
+  );
+};
+
 export default function Perfil() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -52,7 +68,8 @@ export default function Perfil() {
   useEffect(() => {
     const cargarPedidos = async () => {
       try {
-        const token = localStorage.getItem("authToken");
+        const token = getAuthToken();
+        if (!token) throw new Error("Sin token");
         const response = await fetch(`${import.meta.env.VITE_API_URL}/pedidos/pedido/`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -97,7 +114,12 @@ export default function Perfil() {
     e.preventDefault();
 
     try {
-      const token = localStorage.getItem("authToken");
+      const token = getAuthToken();
+      if (!token) {
+        alert("Tu sesión expiró. Iniciá nuevamente.");
+        logout();
+        return;
+      }
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/usuarios/usuarios/${user.id}/`,
         {
@@ -151,7 +173,12 @@ export default function Perfil() {
     }
 
     try {
-      const token = localStorage.getItem("authToken");
+      const token = getAuthToken();
+      if (!token) {
+        alert("Tu sesión expiró. Iniciá nuevamente.");
+        logout();
+        return;
+      }
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/usuarios/usuarios/${user.id}/cambiar_password/`,
         {
@@ -198,7 +225,7 @@ export default function Perfil() {
   }
 
   return (
-    <div className="h-full min-h-[calc(100vh-6rem)] md:min-h-[calc(100vh-8rem)] bg-[#F0F6F6] flex flex-col md:flex-row py-10 px-8 md:px-16 md:items-center md:justify-center">
+    <div className="min-h-screen bg-[#F0F6F6] flex flex-col md:flex-row py-10 px-8 md:px-16 md:items-center md:justify-center">
       <aside className="md:w-1/6 w-full md:mr-12 mb-8 md:mb-0">
         <div className="bg-white rounded-2xl shadow-lg p-0 flex flex-col">
           <button

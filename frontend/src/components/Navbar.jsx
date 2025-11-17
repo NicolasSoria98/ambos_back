@@ -10,17 +10,26 @@ export default function Navbar() {
 
   const [usuario, setUsuario] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(authService.isAuthenticated());
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
     const loadProfile = async () => {
-      if (authService.isAuthenticated()) {
+      // IMPORTANTE: En área de cliente, SOLO verificar autenticación de cliente
+      // NO usar authService.isAuthenticated() que verifica admin O cliente
+      const isClientAuth = authService.isClienteAuthenticated();
+      
+      if (isClientAuth) {
         setIsLoggedIn(true);
         try {
-          const data = await authService.getProfile();
+          // Especificar explícitamente que es cliente (isAdmin = false)
+          const data = await authService.getProfile(false);
           setUsuario(data);
-        } catch {
+        } catch (error) {
+          // Si falla, limpiar sesión de cliente
+          console.error('Error al cargar perfil de cliente:', error);
+          authService.logoutCliente();
           setUsuario(null);
+          setIsLoggedIn(false);
         }
       } else {
         setIsLoggedIn(false);
@@ -33,11 +42,15 @@ export default function Navbar() {
 
   const handleLogout = () => {
     try {
-      authService.logout();
+      // En área de cliente, solo hacer logout de cliente
+      authService.logoutCliente();
       setUsuario(null);
+      setIsLoggedIn(false);
       setMenuOpen(false);
       navigate("/");
-    } catch (_) { }
+    } catch (error) {
+      console.error('Error al cerrar sesión:', error);
+    }
   };
 
   const isActive = (path) => location.pathname === path;

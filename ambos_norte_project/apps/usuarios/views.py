@@ -9,6 +9,7 @@ from django.db.models import Q, Count
 from .models import Usuario, Direccion
 from .serializer import (
     UsuarioSerializer, 
+    PerfilUpdateSerializer,
     DireccionSerializer,
     LoginSerializer,
     RegistroSerializer
@@ -72,11 +73,64 @@ class UsuarioViewSet(viewsets.ModelViewSet):
         """
         if self.action in ['login', 'registro']:
             return [AllowAny()]
-        elif self.action in ['me']:
+        if self.action in ['me']:
             return [IsAuthenticated()]
+        # ✅ FIX: Agregar 'cambiar_password' a las acciones permitidas para usuarios autenticados
+        if self.action in ['retrieve', 'update', 'partial_update', 'cambiar_password']:
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), IsAdminUser()]
+    
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Override del método GET para permitir que usuarios vean su propio perfil
+        """
+        instance = self.get_object()
+        
+        # Verificar que el usuario solo pueda ver su propio perfil o que sea admin
+        if instance.id != request.user.id and not request.user.is_staff:
+            return Response(
+                {'error': 'No tienes permiso para ver este perfil'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+    
+    def update(self, request, *args, **kwargs):
+        """
+        Override del método UPDATE/PATCH para permitir que usuarios editen su propio perfil
+        """
+        instance = self.get_object()
+        
+        if instance.id != request.user.id and not request.user.is_staff:
+            return Response(
+                {'error': 'No tienes permiso para editar este perfil'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        if not request.user.is_staff:
+            campos_protegidos = ['tipo_usuario', 'is_staff', 'is_superuser', 'is_active', 'email', 'username']
+            for campo in campos_protegidos:
+                if campo in request.data:
+                    return Response(
+                        {'error': f'No tienes permiso para modificar el campo {campo}'},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+            
+            serializer = PerfilUpdateSerializer(instance, data=request.data, partial=True)
         else:
-            # list, retrieve, update, destroy requieren ser admin
-            return [IsAuthenticated(), IsAdminUser()]
+            serializer = self.get_serializer(instance, data=request.data, partial=True)
+        
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        
+        return Response(UsuarioSerializer(instance).data)
+    
+    def partial_update(self, request, *args, **kwargs):
+        """
+        Override del método PATCH para usar la misma lógica que update
+        """
+        return self.update(request, *args, **kwargs)
     
     def destroy(self, request, *args, **kwargs):
         """
@@ -233,7 +287,7 @@ class UsuarioViewSet(viewsets.ModelViewSet):
         
         return Response({
             'mensaje': 'Contraseña actualizada correctamente'
-    })
+        })
     
     @action(detail=False, methods=['post'], permission_classes=[AllowAny])
     def login(self, request):
@@ -318,3 +372,20 @@ class DireccionViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         # Asignar automáticamente el usuario autenticado
         serializer.save(usuario=self.request.user)
+    def update(self, request, *args, **kwargs):
+        usuario = self.get_object()
+        if not request.user.is_staff and usuario.id != request.user.id:
+            return Response(
+                {'error': 'No tienes permiso para modificar este usuario'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        usuario = self.get_object()
+        if not request.user.is_staff and usuario.id != request.user.id:
+            return Response(
+                {'error': 'No tienes permiso para modificar este usuario'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().partial_update(request, *args, **kwargs)

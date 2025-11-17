@@ -1,7 +1,8 @@
 import api from './api';
 
 const authService = {
-  // Login de administrador
+  // ============ FUNCIONES DE ADMINISTRADOR ============
+  
   loginAdmin: async (email, password) => {
     try {
       const response = await api.post('/auth/login/', {
@@ -10,10 +11,10 @@ const authService = {
       });
 
       if (response.data.access) {
-        // Guardar tokens y usuario
-        localStorage.setItem('authToken', response.data.access);
-        localStorage.setItem('refreshToken', response.data.refresh);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
+        // Guardar tokens y usuario CON PREFIJO ADMIN
+        localStorage.setItem('admin_authToken', response.data.access);
+        localStorage.setItem('admin_refreshToken', response.data.refresh);
+        localStorage.setItem('admin_user', JSON.stringify(response.data.user));
 
         return {
           success: true,
@@ -35,7 +36,62 @@ const authService = {
     }
   },
 
-  // Login de cliente (usa el mismo endpoint que admin)
+  logoutAdmin: () => {
+    localStorage.removeItem('admin_authToken');
+    localStorage.removeItem('admin_refreshToken');
+    localStorage.removeItem('admin_user');
+  },
+
+  isAdminAuthenticated: () => {
+    const token = localStorage.getItem('admin_authToken');
+    const user = localStorage.getItem('admin_user');
+    return !!(token && user);
+  },
+
+  getAdminUser: () => {
+    const userStr = localStorage.getItem('admin_user');
+    if (userStr) {
+      try {
+        return JSON.parse(userStr);
+      } catch (error) {
+        console.error('Error al parsear usuario admin:', error);
+        return null;
+      }
+    }
+    return null;
+  },
+
+  getAdminToken: () => {
+    return localStorage.getItem('admin_authToken');
+  },
+
+  refreshAdminToken: async () => {
+    try {
+      const refreshToken = localStorage.getItem('admin_refreshToken');
+      
+      if (!refreshToken) {
+        throw new Error('No refresh token');
+      }
+
+      const response = await api.post('/auth/token/refresh/', {
+        refresh: refreshToken
+      });
+
+      if (response.data.access) {
+        localStorage.setItem('admin_authToken', response.data.access);
+        return response.data.access;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error al refrescar token admin:', error);
+      authService.logoutAdmin();
+      return null;
+    }
+  },
+
+  // ============ FUNCIONES DE CLIENTE ============
+  
   loginCliente: async (email, password) => {
     try {
       const response = await api.post('/auth/login/', {
@@ -44,9 +100,10 @@ const authService = {
       });
 
       if (response.data.access) {
-        localStorage.setItem('authToken', response.data.access);
-        localStorage.setItem('refreshToken', response.data.refresh);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
+        // Guardar tokens y usuario CON PREFIJO CLIENT
+        localStorage.setItem('client_authToken', response.data.access);
+        localStorage.setItem('client_refreshToken', response.data.refresh);
+        localStorage.setItem('client_user', JSON.stringify(response.data.user));
 
         return {
           success: true,
@@ -68,15 +125,15 @@ const authService = {
     }
   },
 
-  // Registro de nuevo usuario
   register: async (userData) => {
     try {
       const response = await api.post('/auth/registro/', userData);
 
       if (response.data.access) {
-        localStorage.setItem('authToken', response.data.access);
-        localStorage.setItem('refreshToken', response.data.refresh);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
+        // Guardar como CLIENTE
+        localStorage.setItem('client_authToken', response.data.access);
+        localStorage.setItem('client_refreshToken', response.data.refresh);
+        localStorage.setItem('client_user', JSON.stringify(response.data.user));
 
         return {
           success: true,
@@ -92,7 +149,6 @@ const authService = {
     } catch (error) {
       console.error('Error en register:', error);
       
-      // Manejar errores específicos de validación
       const errors = error.response?.data;
       let message = 'Error al registrar usuario';
       
@@ -112,13 +168,73 @@ const authService = {
     }
   },
 
-  // Obtener perfil del usuario autenticado
-  getProfile: async () => {
+  logoutCliente: () => {
+    localStorage.removeItem('client_authToken');
+    localStorage.removeItem('client_refreshToken');
+    localStorage.removeItem('client_user');
+  },
+
+  isClienteAuthenticated: () => {
+    const token = localStorage.getItem('client_authToken');
+    const user = localStorage.getItem('client_user');
+    return !!(token && user);
+  },
+
+  getClienteUser: () => {
+    const userStr = localStorage.getItem('client_user');
+    if (userStr) {
+      try {
+        return JSON.parse(userStr);
+      } catch (error) {
+        console.error('Error al parsear usuario cliente:', error);
+        return null;
+      }
+    }
+    return null;
+  },
+
+  getClienteToken: () => {
+    return localStorage.getItem('client_authToken');
+  },
+
+  refreshClienteToken: async () => {
+    try {
+      const refreshToken = localStorage.getItem('client_refreshToken');
+      
+      if (!refreshToken) {
+        throw new Error('No refresh token');
+      }
+
+      const response = await api.post('/auth/token/refresh/', {
+        refresh: refreshToken
+      });
+
+      if (response.data.access) {
+        localStorage.setItem('client_authToken', response.data.access);
+        return response.data.access;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error al refrescar token cliente:', error);
+      authService.logoutCliente();
+      return null;
+    }
+  },
+
+  // ============ FUNCIONES GENÉRICAS (para compatibilidad) ============
+  
+  // Obtener perfil del usuario autenticado (detecta automáticamente si es admin o cliente)
+  getProfile: async (isAdmin = false) => {
     try {
       const response = await api.get('/auth/me/');
       
-      // Actualizar usuario en localStorage
-      localStorage.setItem('user', JSON.stringify(response.data));
+      // Actualizar usuario en localStorage según el tipo
+      if (isAdmin) {
+        localStorage.setItem('admin_user', JSON.stringify(response.data));
+      } else {
+        localStorage.setItem('client_user', JSON.stringify(response.data));
+      }
       
       return response.data;
     } catch (error) {
@@ -128,9 +244,10 @@ const authService = {
   },
 
   // Actualizar perfil
-  updateProfile: async (userData) => {
+  updateProfile: async (userData, isAdmin = false) => {
     try {
-      const currentUser = authService.getCurrentUser();
+      const currentUser = isAdmin ? authService.getAdminUser() : authService.getClienteUser();
+      
       if (!currentUser?.id) {
         return {
           success: false,
@@ -140,8 +257,12 @@ const authService = {
 
       const response = await api.patch(`/usuarios/usuarios/${currentUser.id}/`, userData);
       
-      // Actualizar usuario en localStorage
-      localStorage.setItem('user', JSON.stringify(response.data));
+      // Actualizar usuario en localStorage según el tipo
+      if (isAdmin) {
+        localStorage.setItem('admin_user', JSON.stringify(response.data));
+      } else {
+        localStorage.setItem('client_user', JSON.stringify(response.data));
+      }
 
       return {
         success: true,
@@ -157,69 +278,31 @@ const authService = {
     }
   },
 
-  // Refrescar token
-  refreshToken: async () => {
-    try {
-      const refreshToken = localStorage.getItem('refreshToken');
-      
-      if (!refreshToken) {
-        throw new Error('No refresh token');
-      }
-
-      const response = await api.post('/auth/token/refresh/', {
-        refresh: refreshToken
-      });
-
-      if (response.data.access) {
-        localStorage.setItem('authToken', response.data.access);
-        return response.data.access;
-      }
-
-      return null;
-    } catch (error) {
-      console.error('Error al refrescar token:', error);
-      authService.logout();
-      return null;
-    }
-  },
-
-  // Logout
+  // DEPRECATED - Usar logoutAdmin o logoutCliente
   logout: () => {
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('user');
+    authService.logoutAdmin();
+    authService.logoutCliente();
   },
 
-  // Verificar si está autenticado
+  // DEPRECATED - Usar isAdminAuthenticated o isClienteAuthenticated
   isAuthenticated: () => {
-    const token = localStorage.getItem('authToken');
-    const user = localStorage.getItem('user');
-    return !!(token && user);
+    return authService.isAdminAuthenticated() || authService.isClienteAuthenticated();
   },
 
-  // Obtener usuario actual
+  // DEPRECATED - Usar getAdminUser o getClienteUser
   getCurrentUser: () => {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      try {
-        return JSON.parse(userStr);
-      } catch (error) {
-        console.error('Error al parsear usuario:', error);
-        return null;
-      }
-    }
-    return null;
+    return authService.getAdminUser() || authService.getClienteUser();
   },
 
   // Verificar si es administrador
   isAdmin: () => {
-    const user = authService.getCurrentUser();
+    const user = authService.getAdminUser();
     return user?.tipo_usuario === 'administrador' || user?.is_staff === true;
   },
 
   // Verificar si es cliente
   isCliente: () => {
-    const user = authService.getCurrentUser();
+    const user = authService.getClienteUser();
     return user?.tipo_usuario === 'cliente';
   }
 };

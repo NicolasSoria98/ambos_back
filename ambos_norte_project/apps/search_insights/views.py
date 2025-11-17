@@ -4,6 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from datetime import datetime, timedelta
 import logging
+import time
 
 # Pytrends para Google Trends
 try:
@@ -74,8 +75,12 @@ class SearchTrendsView(APIView):
                 fecha_inicio = (datetime.now() - timedelta(days=90)).strftime('%Y-%m-%d')
                 timeframe = f'{fecha_inicio} {fecha_fin}'
             
-            # Inicializar pytrends
-            pytrends = TrendReq(hl='es-AR', tz=360)
+            # DESPUÉS (sin retries):
+            pytrends = TrendReq(
+                hl='es-AR', 
+                tz=360, 
+                timeout=(10, 30)  # (connect timeout, read timeout)
+            )
             
             # Si hay ciudad específica, usarla; sino usar país
             geo_param = ciudad if ciudad else geo
@@ -262,26 +267,68 @@ class SuggestionsView(APIView):
             )
         
         try:
-            keyword = request.data.get('keyword', '')
+            keyword = request.data.get('keyword', '').strip()
             geo = request.data.get('geo', 'AR')
             
-            if not keyword or len(keyword) < 2:
-                return Response(
-                    {'error': 'Keyword debe tener al menos 2 caracteres'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+            # Validación mejorada
+            if not keyword:
+                return Response({
+                    'success': True,
+                    'sugerencias': []
+                })
             
-            pytrends = TrendReq(hl='es-AR', tz=360)
-            suggestions = pytrends.suggestions(keyword=keyword)
+            if len(keyword) < 2:
+                return Response({
+                    'success': True,
+                    'sugerencias': []
+                })
             
-            return Response({
-                'success': True,
-                'sugerencias': suggestions
-            })
-            
-        except Exception as e:
-            logger.error(f"Error obteniendo sugerencias: {str(e)}")
-            return Response(
-                {'error': str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            # Inicializar pytrends SIN retries para evitar el error de urllib3
+            # El problema es que pytrends usa 'method_whitelist' que fue deprecado en urllib3 2.0+
+            pytrends = TrendReq(
+                hl='es-AR', 
+                tz=360,
+                timeout=(5, 15)
+                # NO usar retries ni backoff_factor aquí
             )
+            
+            # Obtener sugerencias con manejo de errores robusto
+            try:
+                suggestions = pytrends.suggestions(keyword=keyword)
+                
+                # Validar que suggestions sea una lista
+                if not isinstance(suggestions, list):
+                    suggestions = []
+                
+                # Limitar a 10 sugerencias máximo
+                suggestions = suggestions[:10]
+                
+                return Response({
+                    'success': True,
+                    'sugerencias': suggestions,
+                    'keyword': keyword
+                })
+                
+            except ConnectionError as e:
+                logger.error(f"Error de conexión obteniendo sugerencias: {str(e)}")
+                return Response({
+                    'success': True,  # Cambiar a True para que el frontend no muestre error
+                    'sugerencias': [],
+                    'mensaje': 'No se pudieron obtener sugerencias en este momento'
+                })
+                
+            except Exception as e:
+                logger.error(f"Error en pytrends.suggestions: {str(e)}")
+                return Response({
+                    'success': True,  # Cambiar a True para que el frontend no muestre error
+                    'sugerencias': [],
+                    'mensaje': 'No se pudieron obtener sugerencias en este momento'
+                })
+                
+        except Exception as e:
+            logger.error(f"Error inesperado obteniendo sugerencias: {str(e)}", exc_info=True)
+            return Response({
+                'success': True,  # Cambiar a True para evitar errores en el frontend
+                'sugerencias': [],
+                'mensaje': 'Error temporal obteniendo sugerencias'
+            })

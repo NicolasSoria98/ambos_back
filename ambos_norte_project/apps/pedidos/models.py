@@ -1,7 +1,7 @@
 from django.db import models
 from django.conf import settings
 from apps.usuarios.models import Direccion
-from apps.catalogo.models import Producto
+from apps.catalogo.models import Producto, ProductoVariante
 
 # Create your models here.
 class Pedido(models.Model):
@@ -73,6 +73,14 @@ class ItemPedido(models.Model):
         Producto,
         on_delete=models.PROTECT
     )
+    variante = models.ForeignKey(
+        ProductoVariante,
+        on_delete=models.PROTECT,
+        related_name='items_pedido',
+        blank=True,
+        null=True,
+        help_text='Variante específica del producto seleccionada'
+    )
     nombre_producto = models.CharField(max_length=255)  # Guardar nombre por si el producto cambia
     cantidad = models.IntegerField()
     precio_unitario = models.DecimalField(max_digits=10, decimal_places=2)
@@ -84,7 +92,9 @@ class ItemPedido(models.Model):
         verbose_name_plural = 'Items de Pedido'
     
     def __str__(self):
-        return f"{self.cantidad}x {self.producto}"
+        if self.variante:
+            return f"{self.cantidad}x {self.nombre_producto} ({self.variante.talla.nombre} - {self.variante.color.nombre})"
+        return f"{self.cantidad}x {self.nombre_producto}"
 
 
 class HistorialEstadoPedido(models.Model):

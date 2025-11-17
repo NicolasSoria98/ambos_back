@@ -74,6 +74,11 @@ const productsService = {
     return response.data;
   },
 
+  getSexosDisponibles: async () => {
+    const response = await api.get('/catalogo/producto/sexos_disponibles/');
+    return response.data;
+  },
+
   /**
    * NUEVO: Obtener variantes con stock bajo
    * Retorna todas las variantes que tengan stock <= umbral
@@ -224,8 +229,8 @@ const productsService = {
 
   // ============ TALLAS ============
   
-  getTallas: async () => {
-    const response = await api.get('/catalogo/talla/');
+  getTallas: async (params = {}) => {
+    const response = await api.get('/catalogo/talla/', { params });
     return response.data;
   },
 
@@ -246,8 +251,8 @@ const productsService = {
 
   // ============ COLORES ============
   
-  getColores: async () => {
-    const response = await api.get('/catalogo/color/');
+  getColores: async (params = {}) => {
+    const response = await api.get('/catalogo/color/', { params });
     return response.data;
   },
 

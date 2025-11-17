@@ -183,7 +183,35 @@ const paymentsService = {
     };
 
     return mensajes[statusDetail] || 'El pago no pudo ser procesado';
+  },
+  /**
+   * Cambia el estado de un pago (solo admin)
+   * 
+   * @param {number} pagoId - ID del pago
+   * @param {string} nuevoEstado - Nuevo estado (aprobado, cancelado, pendiente)
+   * @returns {Promise<Object>} Resultado de la operación
+   */
+  cambiarEstado: async (pagoId, nuevoEstado) => {
+    try {
+      console.log(`🔄 Cambiando estado del pago ${pagoId} a ${nuevoEstado}`);
+      
+      const response = await api.patch(`/pagos/pago/${pagoId}/cambiar_estado/`, {
+        estado: nuevoEstado
+      });
+      
+      console.log('✅ Estado actualizado:', response.data);
+      
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('❌ Error actualizando estado:', error);
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || 'Error al actualizar estado'
+      };
+    }
   }
 };
-
 export default paymentsService;

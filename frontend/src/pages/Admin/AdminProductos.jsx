@@ -3,6 +3,7 @@ import AdminSidebar from '../../components/admin/AdminSidebar';
 import productsService from '../../services/products';
 
 export default function AdminProductos() {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [productos, setProductos] = useState([]);
   const [categorias, setCategorias] = useState([]);
   const [tallas, setTallas] = useState([]);
@@ -20,6 +21,7 @@ export default function AdminProductos() {
     nombre: '',
     descripcion: '',
     precio_base: '',
+    sexo: '',
     material: '',
     categoria: '',
     activo: true,
@@ -196,6 +198,7 @@ export default function AdminProductos() {
       const dataToSend = {
         nombre: formData.nombre,
         precio_base: formData.precio_base,
+        sexo: formData.sexo || null,
         categoria: formData.categoria,
         activo: formData.activo,
         destacado: formData.destacado,
@@ -320,6 +323,7 @@ export default function AdminProductos() {
         nombre: productoCompleto.nombre,
         descripcion: productoCompleto.descripcion || '',
         precio_base: productoCompleto.precio_base,
+        sexo: productoCompleto.sexo || '',
         material: productoCompleto.material || '',
         categoria: productoCompleto.categoria,
         activo: productoCompleto.activo,
@@ -384,6 +388,7 @@ export default function AdminProductos() {
       nombre: '',
       descripcion: '',
       precio_base: '',
+      sexo: '',
       material: '',
       categoria: '',
       activo: true,
@@ -411,7 +416,7 @@ export default function AdminProductos() {
   if (loading) {
     return (
       <div className="flex h-screen">
-        <AdminSidebar />
+        <AdminSidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <i className="fas fa-spinner fa-spin text-4xl text-indigo-600 mb-4"></i>
@@ -423,39 +428,47 @@ export default function AdminProductos() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-100">
-      <AdminSidebar />
+    <div className="flex min-h-screen bg-gray-100">
+      <AdminSidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
       
-      <div className="flex-1 overflow-auto">
-        <div className="p-8">
+      <div className="flex-1 w-full lg:w-auto overflow-auto">
+        <div className="p-4 sm:p-6 lg:p-8">
+          {/* Botón hamburguesa para móvil */}
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="lg:hidden fixed top-4 left-4 z-40 p-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 transition"
+          >
+            <i className="fas fa-bars text-xl"></i>
+          </button>
+
           {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">
-              <i className="fas fa-shopping-bag mr-3"></i>
+          <div className="mb-6 sm:mb-8 pt-12 lg:pt-0">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">
+              <i className="fas fa-shopping-bag mr-2 sm:mr-3"></i>
               Gestión de Productos
             </h1>
-            <p className="text-gray-600">Administra el catálogo de productos con variantes e imágenes</p>
+            <p className="text-sm sm:text-base text-gray-600">Administra el catálogo de productos con variantes e imágenes</p>
           </div>
 
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-6">
+            <div className="bg-red-50 border border-red-200 text-red-700 px-3 sm:px-4 py-2 sm:py-3 rounded mb-4 sm:mb-6 text-sm">
               <i className="fas fa-exclamation-circle mr-2"></i>
               {error}
             </div>
           )}
 
           {/* Filtros y búsqueda */}
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 mb-4 sm:mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
               <div className="md:col-span-2">
                 <div className="relative">
-                  <i className="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                  <i className="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm sm:text-base"></i>
                   <input
                     type="text"
                     placeholder="Buscar productos..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full pl-9 sm:pl-10 pr-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   />
                 </div>
               </div>
@@ -463,7 +476,7 @@ export default function AdminProductos() {
               <select
                 value={filterCategoria}
                 onChange={(e) => setFilterCategoria(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="px-3 sm:px-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               >
                 <option value="">Todas las categorías</option>
                 {categorias.map(cat => (
@@ -472,13 +485,13 @@ export default function AdminProductos() {
               </select>
             </div>
 
-            <div className="mt-4">
+            <div className="mt-3 sm:mt-4">
               <button
                 onClick={() => {
                   resetForm();
                   setShowModal(true);
                 }}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg transition flex items-center gap-2"
+                className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-4 sm:px-6 py-2 rounded-lg transition flex items-center justify-center gap-2 text-sm sm:text-base"
               >
                 <i className="fas fa-plus"></i>
                 Nuevo Producto
@@ -489,17 +502,18 @@ export default function AdminProductos() {
           {/* Tabla de productos */}
           <div className="bg-white rounded-lg shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-[800px]">
                 <thead className="bg-gray-50 border-b">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Imagen</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Categoría</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Precio</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock Total</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Variantes</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase">Imagen</th>
+                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
+                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase">Categoría</th>
+                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase">Sexo</th>
+                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase">Precio</th>
+                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock Total</th>
+                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase">Variantes</th>
+                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
+                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -507,51 +521,62 @@ export default function AdminProductos() {
                     const categoria = categorias.find(c => c.id === producto.categoria);
                     return (
                       <tr key={producto.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4">
+                        <td className="px-3 sm:px-6 py-3 sm:py-4">
                           {producto.imagen_principal ? (
                             <img
                               src={producto.imagen_principal}
                               alt={producto.nombre}
-                              className="w-16 h-16 object-cover rounded"
+                              className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded"
                             />
                           ) : (
-                            <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center">
-                              <i className="fas fa-image text-gray-400"></i>
+                            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-200 rounded flex items-center justify-center">
+                              <i className="fas fa-image text-gray-400 text-sm sm:text-base"></i>
                             </div>
                           )}
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="font-medium text-gray-900">{producto.nombre}</div>
+                        <td className="px-3 sm:px-6 py-3 sm:py-4">
+                          <div className="font-medium text-gray-900 text-sm sm:text-base">{producto.nombre}</div>
                           {producto.destacado && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 mt-1">
+                            <span className="inline-flex items-center px-1.5 sm:px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 mt-1">
                               <i className="fas fa-star mr-1"></i>Destacado
                             </span>
                           )}
                         </td>
-                        <td className="px-6 py-4 text-gray-600">
+                        <td className="px-3 sm:px-6 py-3 sm:py-4 text-gray-600 text-xs sm:text-sm">
                           {categoria?.nombre || 'Sin categoría'}
                         </td>
-                        <td className="px-6 py-4 font-medium text-gray-900">
+                        <td className="px-3 sm:px-6 py-3 sm:py-4">
+                          {producto.sexo ? (
+                            <span className={`inline-flex items-center px-1.5 sm:px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              producto.sexo === 'M' ? 'bg-blue-100 text-blue-800' : 'bg-pink-100 text-pink-800'
+                            }`}>
+                              {producto.sexo === 'M' ? 'M' : 'F'}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 text-sm">-</span>
+                          )}
+                        </td>
+                        <td className="px-3 sm:px-6 py-3 sm:py-4 font-medium text-gray-900 text-xs sm:text-sm">
                           ${parseFloat(producto.precio_base).toFixed(2)}
                         </td>
-                        <td className="px-6 py-4">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        <td className="px-3 sm:px-6 py-3 sm:py-4">
+                          <span className={`inline-flex items-center px-1.5 sm:px-2.5 py-0.5 rounded-full text-xs font-medium ${
                             producto.stock_total > 10 ? 'bg-green-100 text-green-800' :
                             producto.stock_total > 0 ? 'bg-yellow-100 text-yellow-800' :
                             'bg-red-100 text-red-800'
                           }`}>
-                            {producto.stock_total || 0} unidades
+                            {producto.stock_total || 0}
                           </span>
                         </td>
-                        <td className="px-6 py-4">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            {producto.variantes_count || 0} variantes
+                        <td className="px-3 sm:px-6 py-3 sm:py-4">
+                          <span className="inline-flex items-center px-1.5 sm:px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            {producto.variantes_count || 0}
                           </span>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-3 sm:px-6 py-3 sm:py-4">
                           <button
                             onClick={() => handleToggleActivo(producto)}
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer transition ${
+                            className={`inline-flex items-center px-1.5 sm:px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer transition ${
                               producto.activo 
                                 ? 'bg-green-100 text-green-800 hover:bg-green-200' 
                                 : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
@@ -561,18 +586,18 @@ export default function AdminProductos() {
                             {producto.activo ? 'Activo' : 'Inactivo'}
                           </button>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-3 sm:px-6 py-3 sm:py-4">
                           <div className="flex gap-2">
                             <button
                               onClick={() => handleEdit(producto)}
-                              className="text-indigo-600 hover:text-indigo-900"
+                              className="text-indigo-600 hover:text-indigo-900 text-sm sm:text-base"
                               title="Editar"
                             >
                               <i className="fas fa-edit"></i>
                             </button>
                             <button
                               onClick={() => handleDelete(producto.id)}
-                              className="text-red-600 hover:text-red-900"
+                              className="text-red-600 hover:text-red-900 text-sm sm:text-base"
                               title="Desactivar"
                             >
                               <i className="fas fa-ban"></i>
@@ -586,9 +611,9 @@ export default function AdminProductos() {
               </table>
 
               {productosFiltrados.length === 0 && (
-                <div className="text-center py-12">
-                  <i className="fas fa-box-open text-4xl text-gray-300 mb-4"></i>
-                  <p className="text-gray-500">No se encontraron productos</p>
+                <div className="text-center py-8 sm:py-12">
+                  <i className="fas fa-box-open text-3xl sm:text-4xl text-gray-300 mb-4"></i>
+                  <p className="text-gray-500 text-sm sm:text-base">No se encontraron productos</p>
                 </div>
               )}
             </div>
@@ -598,11 +623,11 @@ export default function AdminProductos() {
 
       {/* Modal de crear/editar producto */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-800">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center z-50 p-0 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-none sm:rounded-lg w-full sm:max-w-6xl sm:max-h-[90vh] sm:overflow-y-auto my-0 sm:my-4">
+            <div className="p-4 sm:p-6">
+              <div className="flex justify-between items-center mb-4 sm:mb-6 sticky top-0 bg-white z-10 pb-3 border-b sm:border-0">
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
                   {editingProduct ? 'Editar Producto' : 'Nuevo Producto'}
                 </h2>
                 <button
@@ -612,18 +637,18 @@ export default function AdminProductos() {
                   }}
                   className="text-gray-400 hover:text-gray-600"
                 >
-                  <i className="fas fa-times text-2xl"></i>
+                  <i className="fas fa-times text-xl sm:text-2xl"></i>
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-6">
+              <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
                 {/* INFORMACIÓN BÁSICA */}
                 <div className="border-b pb-4">
-                  <h3 className="text-lg font-semibold text-gray-700 mb-4">Información Básica</h3>
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-700 mb-3 sm:mb-4">Información Básica</h3>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                     <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                         Nombre *
                       </label>
                       <input
@@ -632,12 +657,12 @@ export default function AdminProductos() {
                         value={formData.nombre}
                         onChange={handleInputChange}
                         required
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                       />
                     </div>
 
                     <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                         Descripción
                       </label>
                       <textarea
@@ -645,12 +670,12 @@ export default function AdminProductos() {
                         value={formData.descripcion}
                         onChange={handleInputChange}
                         rows={3}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                         Categoría *
                       </label>
                       <div className="flex gap-2">
@@ -659,7 +684,7 @@ export default function AdminProductos() {
                           value={formData.categoria}
                           onChange={handleInputChange}
                           required
-                          className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                          className="flex-1 px-3 sm:px-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                         >
                           <option value="">Seleccionar categoría</option>
                           {categorias.map(cat => (
@@ -669,17 +694,17 @@ export default function AdminProductos() {
                         <button
                           type="button"
                           onClick={() => setShowCategoriaModal(true)}
-                          className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition flex items-center gap-2"
+                          className="px-2 sm:px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
                           title="Crear nueva categoría"
                         >
                           <i className="fas fa-plus"></i>
-                          Nueva
+                          <span className="hidden sm:inline">Nueva</span>
                         </button>
                       </div>
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                         Precio *
                       </label>
                       <input
@@ -690,12 +715,31 @@ export default function AdminProductos() {
                         step="0.01"
                         min="0"
                         required
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
+                        Sexo
+                      </label>
+                      <select
+                        name="sexo"
+                        value={formData.sexo}
+                        onChange={handleInputChange}
+                        className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      >
+                        <option value="">Seleccionar sexo</option>
+                        <option value="M">👨 Masculino</option>
+                        <option value="F">👩 Femenino</option>
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Todas las variantes serán del mismo sexo
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                         Material
                       </label>
                       <input
@@ -704,28 +748,28 @@ export default function AdminProductos() {
                         value={formData.material}
                         onChange={handleInputChange}
                         placeholder="Ej: Algodón, Poliéster"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                         Imagen Principal
                       </label>
                       <input
                         type="file"
                         accept="image/*"
                         onChange={handleImageChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        className="w-full px-3 sm:px-4 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                       />
                       {editingProduct?.imagen_principal && (
-                        <p className="text-sm text-gray-500 mt-2">
+                        <p className="text-xs text-gray-500 mt-2 truncate">
                           Imagen actual: {editingProduct.imagen_principal.split('/').pop()}
                         </p>
                       )}
                     </div>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
                       <label className="flex items-center gap-2">
                         <input
                           type="checkbox"
@@ -734,7 +778,7 @@ export default function AdminProductos() {
                           onChange={handleInputChange}
                           className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                         />
-                        <span className="text-sm font-medium text-gray-700">Activo</span>
+                        <span className="text-xs sm:text-sm font-medium text-gray-700">Activo</span>
                       </label>
 
                       <label className="flex items-center gap-2">
@@ -745,7 +789,7 @@ export default function AdminProductos() {
                           onChange={handleInputChange}
                           className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                         />
-                        <span className="text-sm font-medium text-gray-700">Destacado</span>
+                        <span className="text-xs sm:text-sm font-medium text-gray-700">Destacado</span>
                       </label>
                     </div>
                   </div>
@@ -753,32 +797,32 @@ export default function AdminProductos() {
 
                 {/* VARIANTES */}
                 <div className="border-b pb-4">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-semibold text-gray-700">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0 mb-4">
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-700">
                       Variantes (Tallas, Colores e Imágenes)
                     </h3>
                     <button
                       type="button"
                       onClick={agregarVariante}
-                      className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2"
+                      className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm flex items-center justify-center gap-2"
                     >
                       <i className="fas fa-plus"></i>
                       Agregar Variante
                     </button>
                   </div>
 
-                  <div className="space-y-6">
+                  <div className="space-y-4 sm:space-y-6">
                     {variantes.map((variante, index) => (
-                      <div key={index} className="bg-gray-50 p-4 rounded-lg border-2 border-gray-200">
-                        <div className="flex justify-between items-start mb-4">
-                          <span className="text-sm font-semibold text-gray-700 bg-indigo-100 px-3 py-1 rounded-full">
+                      <div key={index} className="bg-gray-50 p-3 sm:p-4 rounded-lg border-2 border-gray-200">
+                        <div className="flex justify-between items-start mb-3 sm:mb-4">
+                          <span className="text-xs sm:text-sm font-semibold text-gray-700 bg-indigo-100 px-2 sm:px-3 py-1 rounded-full">
                             Variante #{index + 1}
                           </span>
                           {variantes.length > 1 && (
                             <button
                               type="button"
                               onClick={() => eliminarVariante(index)}
-                              className="text-red-600 hover:text-red-800 bg-red-50 px-3 py-1 rounded-lg"
+                              className="text-red-600 hover:text-red-800 bg-red-50 px-2 sm:px-3 py-1 rounded-lg text-xs sm:text-sm"
                               title="Eliminar variante"
                             >
                               <i className="fas fa-trash mr-1"></i>
@@ -787,7 +831,7 @@ export default function AdminProductos() {
                           )}
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-3 sm:mb-4">
                           <div>
                             <label className="block text-xs font-medium text-gray-600 mb-1">
                               Talla *
@@ -796,7 +840,7 @@ export default function AdminProductos() {
                               value={variante.talla}
                               onChange={(e) => handleVarianteChange(index, 'talla', e.target.value)}
                               required
-                              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                              className="w-full px-2 sm:px-3 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                             >
                               <option value="">Seleccionar</option>
                               {tallas.map(t => (
@@ -813,7 +857,7 @@ export default function AdminProductos() {
                               value={variante.color}
                               onChange={(e) => handleVarianteChange(index, 'color', e.target.value)}
                               required
-                              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                              className="w-full px-2 sm:px-3 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                             >
                               <option value="">Seleccionar</option>
                               {colores.map(c => (
@@ -832,14 +876,14 @@ export default function AdminProductos() {
                               onChange={(e) => handleVarianteChange(index, 'stock', e.target.value)}
                               min="0"
                               required
-                              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                              className="w-full px-2 sm:px-3 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                             />
                           </div>
                         </div>
 
                         {/* IMÁGENES DE LA VARIANTE */}
-                        <div className="bg-white p-4 rounded-lg border border-gray-200">
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <div className="bg-white p-3 sm:p-4 rounded-lg border border-gray-200">
+                          <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                             <i className="fas fa-images mr-2"></i>
                             Imágenes de esta variante
                           </label>
@@ -849,7 +893,7 @@ export default function AdminProductos() {
                             accept="image/*"
                             multiple
                             onChange={(e) => handleVarianteImagenesChange(index, e.target.files)}
-                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent mb-3"
+                            className="w-full px-2 sm:px-3 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent mb-3"
                           />
 
                           {/* Preview de imágenes existentes */}
@@ -862,12 +906,12 @@ export default function AdminProductos() {
                                     <img
                                       src={img.imagen_url}
                                       alt={`Variante ${index + 1} - Imagen ${imgIndex + 1}`}
-                                      className="w-full h-20 object-cover rounded border"
+                                      className="w-full h-16 sm:h-20 object-cover rounded border"
                                     />
                                     <button
                                       type="button"
                                       onClick={() => eliminarImagenExistenteVariante(index, img.id)}
-                                      className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition text-xs"
+                                      className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition text-xs"
                                       title="Eliminar"
                                     >
                                       <i className="fas fa-times"></i>
@@ -888,12 +932,12 @@ export default function AdminProductos() {
                                     <img
                                       src={URL.createObjectURL(imagen)}
                                       alt={`Preview ${imgIndex + 1}`}
-                                      className="w-full h-20 object-cover rounded border border-green-500"
+                                      className="w-full h-16 sm:h-20 object-cover rounded border border-green-500"
                                     />
                                     <button
                                       type="button"
                                       onClick={() => eliminarImagenVariante(index, imgIndex)}
-                                      className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition text-xs"
+                                      className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition text-xs"
                                       title="Quitar"
                                     >
                                       <i className="fas fa-times"></i>
@@ -908,7 +952,7 @@ export default function AdminProductos() {
                           )}
 
                           {!variante.imagenes?.length && !variante.imagenesExistentes?.length && (
-                            <p className="text-xs text-gray-500 text-center py-4">
+                            <p className="text-xs text-gray-500 text-center py-3 sm:py-4">
                               No hay imágenes para esta variante
                             </p>
                           )}
@@ -918,19 +962,19 @@ export default function AdminProductos() {
                   </div>
 
                   {variantes.length === 0 && (
-                    <div className="text-center py-8 text-gray-500">
-                      <i className="fas fa-box-open text-3xl mb-2"></i>
-                      <p>No hay variantes agregadas</p>
-                      <p className="text-sm">Haz clic en "Agregar Variante" para comenzar</p>
+                    <div className="text-center py-6 sm:py-8 text-gray-500">
+                      <i className="fas fa-box-open text-2xl sm:text-3xl mb-2"></i>
+                      <p className="text-sm sm:text-base">No hay variantes agregadas</p>
+                      <p className="text-xs sm:text-sm">Haz clic en "Agregar Variante" para comenzar</p>
                     </div>
                   )}
                 </div>
 
                 {/* BOTONES DE ACCIÓN */}
-                <div className="flex gap-4 pt-4">
+                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-4 sticky bottom-0 bg-white pb-4 sm:pb-0">
                   <button
                     type="submit"
-                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg transition font-medium"
+                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 sm:py-3 rounded-lg transition font-medium text-sm sm:text-base"
                   >
                     <i className="fas fa-save mr-2"></i>
                     {editingProduct ? 'Actualizar' : 'Crear'} Producto
@@ -941,7 +985,7 @@ export default function AdminProductos() {
                       setShowModal(false);
                       resetForm();
                     }}
-                    className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 rounded-lg transition font-medium"
+                    className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-2.5 sm:py-3 rounded-lg transition font-medium text-sm sm:text-base"
                   >
                     <i className="fas fa-times mr-2"></i>
                     Cancelar
@@ -956,10 +1000,10 @@ export default function AdminProductos() {
       {/* Modal de crear nueva categoría */}
       {showCategoriaModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
-          <div className="bg-white rounded-lg max-w-md w-full">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold text-gray-800">
+          <div className="bg-white rounded-lg w-full max-w-md mx-4">
+            <div className="p-4 sm:p-6">
+              <div className="flex justify-between items-center mb-4 sm:mb-6">
+                <h3 className="text-lg sm:text-xl font-bold text-gray-800">
                   <i className="fas fa-folder-plus mr-2 text-green-600"></i>
                   Nueva Categoría
                 </h3>
@@ -970,13 +1014,13 @@ export default function AdminProductos() {
                   }}
                   className="text-gray-400 hover:text-gray-600"
                 >
-                  <i className="fas fa-times text-xl"></i>
+                  <i className="fas fa-times text-lg sm:text-xl"></i>
                 </button>
               </div>
 
-              <form onSubmit={handleCrearCategoria} className="space-y-4">
+              <form onSubmit={handleCrearCategoria} className="space-y-3 sm:space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                     Nombre de la categoría *
                   </label>
                   <input
@@ -985,13 +1029,13 @@ export default function AdminProductos() {
                     onChange={(e) => setNuevaCategoria({ ...nuevaCategoria, nombre: e.target.value })}
                     placeholder="Ej: Remeras, Pantalones, etc."
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     autoFocus
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                     Descripción (opcional)
                   </label>
                   <textarea
@@ -999,14 +1043,14 @@ export default function AdminProductos() {
                     onChange={(e) => setNuevaCategoria({ ...nuevaCategoria, descripcion: e.target.value })}
                     placeholder="Descripción de la categoría"
                     rows={3}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   />
                 </div>
 
-                <div className="flex gap-3 pt-4">
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-2 sm:pt-4">
                   <button
                     type="submit"
-                    className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg transition font-medium"
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg transition font-medium text-sm sm:text-base"
                   >
                     <i className="fas fa-check mr-2"></i>
                     Crear Categoría
@@ -1017,7 +1061,7 @@ export default function AdminProductos() {
                       setShowCategoriaModal(false);
                       setNuevaCategoria({ nombre: '', descripcion: '' });
                     }}
-                    className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 rounded-lg transition font-medium"
+                    className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 rounded-lg transition font-medium text-sm sm:text-base"
                   >
                     <i className="fas fa-times mr-2"></i>
                     Cancelar

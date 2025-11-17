@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import CategoryFilter from "../components/CategoryFilter";
 import ProductCard from "../components/ProductCard";
 
@@ -25,19 +26,59 @@ const hasProductStock = (product) => {
   return true;
 };
 
+const parseQueryValues = (params, key) => {
+  const values = params.getAll(key);
+  if (values.length) {
+    return values;
+  }
+  const single = params.get(key);
+  if (single) {
+    return single.split(",").map((value) => value.trim()).filter(Boolean);
+  }
+  return [];
+};
+
 export default function Catalogo() {
+  const location = useLocation();
   const [productos, setProductos] = useState([]);
   const [filteredProductos, setFilteredProductos] = useState([]);
   const [productSizeMap, setProductSizeMap] = useState({});
+  const [productColorMap, setProductColorMap] = useState({});
   const [filters, setFilters] = useState({
     categories: [],
     sizes: [],
+    colors: [],
+    sexos: [],
     order: "asc",
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const queryFilters = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    const sexoFilters = parseQueryValues(params, "sexo");
+    return {
+      sexos: sexoFilters.map((value) => value.toUpperCase()),
+    };
+  }, [location.search]);
 
-  const fetchProductSizes = useCallback(async (productIds = []) => {
+  useEffect(() => {
+    setFilters((prev) => {
+      const prevSexos = Array.isArray(prev.sexos) ? prev.sexos : [];
+      const nextSexos = queryFilters.sexos || [];
+      const same =
+        prevSexos.length === nextSexos.length &&
+        prevSexos.every((value, index) => value === nextSexos[index]);
+      if (same) {
+        return prev;
+      }
+      return {
+        ...prev,
+        sexos: nextSexos,
+      };
+    });
+  }, [queryFilters]);
+
+  const fetchProductVariantData = useCallback(async (productIds = []) => {
     if (!productIds.length) return;
 
     try {
@@ -58,11 +99,22 @@ export default function Catalogo() {
                 return null;
               })
               .filter(Boolean);
+            const colores = variantes
+              .map((variant) => {
+                if (variant?.color?.id) return String(variant.color.id);
+                if (variant?.color) return String(variant.color);
+                return null;
+              })
+              .filter(Boolean);
 
-            return { id, talles: [...new Set(talles)] };
+            return {
+              id,
+              talles: [...new Set(talles)],
+              colores: [...new Set(colores)],
+            };
           } catch (detailError) {
-            console.error("No se pudo obtener talles para el producto", id, detailError);
-            return { id, talles: [] };
+            console.error("No se pudo obtener variantes para el producto", id, detailError);
+            return { id, talles: [], colores: [] };
           }
         })
       );
@@ -76,8 +128,18 @@ export default function Catalogo() {
         });
         return nextMap;
       });
+
+      setProductColorMap((prev) => {
+        const nextMap = { ...prev };
+        details.forEach(({ id, colores }) => {
+          if (!nextMap[id] || colores.length) {
+            nextMap[id] = colores;
+          }
+        });
+        return nextMap;
+      });
     } catch (err) {
-      console.error("Error al cargar talles de productos", err);
+      console.error("Error al cargar variantes de productos", err);
     }
   }, []);
 
@@ -102,7 +164,7 @@ export default function Catalogo() {
 
       const ids = listConStock.map((product) => product.id).filter(Boolean);
       if (ids.length) {
-        fetchProductSizes(ids);
+        fetchProductVariantData(ids);
       }
     } catch (e) {
       setError(e.message || "Error inesperado al cargar el catalogo");
@@ -111,14 +173,14 @@ export default function Catalogo() {
     } finally {
       setLoading(false);
     }
-  }, [fetchProductSizes]);
+  }, [fetchProductVariantData]);
 
   useEffect(() => {
     fetchProductos();
   }, [fetchProductos]);
 
   useEffect(() => {
-    const applyFilters = async () => {
+    const applyFilters = () => {
       if (!productos.length) {
         setFilteredProductos([]);
         return;
@@ -127,6 +189,17 @@ export default function Catalogo() {
       let result = [...productos];
       const selectedCategories = filters.categories?.map(String) || [];
       const selectedSizes = filters.sizes?.map(String) || [];
+      const selectedColors = Array.isArray(filters.colors)
+        ? filters.colors.map(String)
+        : Array.isArray(filters.colores)
+        ? filters.colores.map(String)
+        : [];
+      const sexoFilters = filters.sexos ?? filters.sexo ?? [];
+      const selectedSexos = Array.isArray(sexoFilters)
+        ? sexoFilters.map(String)
+        : sexoFilters
+        ? [String(sexoFilters)]
+        : [];
 
       if (selectedCategories.length) {
         result = result.filter((product) =>
@@ -134,21 +207,51 @@ export default function Catalogo() {
         );
       }
 
+      if (selectedSexos.length) {
+        result = result.filter((product) =>
+          product.sexo ? selectedSexos.includes(String(product.sexo)) : false
+        );
+      }
+
+      const pendingSizeIds = selectedSizes.length
+        ? new Set(
+            result
+              .filter((product) => !productSizeMap[product.id])
+              .map((product) => product.id)
+          )
+        : new Set();
+      const pendingColorIds = selectedColors.length
+        ? new Set(
+            result
+              .filter((product) => !productColorMap[product.id])
+              .map((product) => product.id)
+          )
+        : new Set();
+
+      const idsToFetch = Array.from(
+        new Set([...pendingSizeIds, ...pendingColorIds])
+      );
+      if (idsToFetch.length) {
+        fetchProductVariantData(idsToFetch);
+      }
+
       if (selectedSizes.length) {
-        const missingIds = result
-          .filter((product) => !productSizeMap[product.id])
-          .map((product) => product.id);
-
-        if (missingIds.length) {
-          fetchProductSizes(missingIds);
-        }
-
         result = result.filter((product) => {
           const talles = productSizeMap[product.id] || [];
-          if (!talles.length && selectedSizes.length && missingIds.length) {
+          if (!talles.length && pendingSizeIds.has(product.id)) {
             return true;
           }
           return selectedSizes.some((size) => talles.includes(size));
+        });
+      }
+
+      if (selectedColors.length) {
+        result = result.filter((product) => {
+          const colores = productColorMap[product.id] || [];
+          if (!colores.length && pendingColorIds.has(product.id)) {
+            return true;
+          }
+          return selectedColors.some((color) => colores.includes(color));
         });
       }
 
@@ -162,7 +265,13 @@ export default function Catalogo() {
     };
 
     applyFilters();
-  }, [productos, filters, productSizeMap, fetchProductSizes]);
+  }, [
+    productos,
+    filters,
+    productSizeMap,
+    productColorMap,
+    fetchProductVariantData,
+  ]);
 
   const handleFiltersChange = (newFilters) => {
     setFilters((prev) => ({
@@ -176,7 +285,7 @@ export default function Catalogo() {
       <aside className="w-full md:w-96 bg-white border-gray-200">
         <CategoryFilter defaultFilters={filters} onFiltersChange={handleFiltersChange} />
       </aside>
-      <main className="flex-1 p-6 md:mt-24">
+      <main className="flex-1 p-8 md:pt-32">
         {loading && <p className="text-gray-600">Cargando productos...</p>}
         {error && <p className="text-red-600">{error}</p>}
         {!loading && !error && (

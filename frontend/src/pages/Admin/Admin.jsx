@@ -13,7 +13,7 @@ import {
   Filler,
 } from 'chart.js';
 import AdminSidebar from '../../components/admin/AdminSidebar';
-import KPICard from '../../components/admin/KpiCard';
+import KPICard from '../../components/admin/Kpicard';
 import ChartCard from '../../components/admin/Chartcard';
 import analyticsService from '../../services/analytics';
 import productsService from '../../services/products';
@@ -33,6 +33,7 @@ ChartJS.register(
 );
 
 export default function AdminDashboard() {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [kpis, setKpis] = useState({});
   const [topProductos, setTopProductos] = useState([]);
@@ -117,9 +118,6 @@ export default function AdminDashboard() {
       console.log('📦 Pedidos de ayer:', cantidadPedidosAyer);
       console.log('📦 Cambio:', cambioPedidos.toFixed(2) + '%');
       
-      // Obtener resumen de métricas para usuarios
-      const resumenData = await analyticsService.getResumenMetricas();
-      
       // ========== TOP 5 PRODUCTOS MÁS VENDIDOS ==========
       const productosVendidosData = await analyticsService.getTopProductosVendidos(5);
       setTopProductos(productosVendidosData);
@@ -177,10 +175,6 @@ export default function AdminDashboard() {
         pedidos: {
           hoy: cantidadPedidosHoy,
           cambio: cambioPedidos,
-        },
-        usuarios: {
-          hoy: resumenData.usuarios_activos_hoy || 0,
-          cambio: resumenData.cambio_usuarios || 0,
         },
         ticket: {
           hoy: ticketPromedioMes,
@@ -406,7 +400,7 @@ export default function AdminDashboard() {
   if (loading) {
     return (
       <div className="flex h-screen">
-        <AdminSidebar />
+        <AdminSidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600 mx-auto"></div>
@@ -419,19 +413,27 @@ export default function AdminDashboard() {
 
   return (
     <div className="flex min-h-screen bg-gray-50">
-      <AdminSidebar />
+      <AdminSidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
 
-      <main className="flex-1 p-8">
+      <main className="flex-1 w-full lg:w-auto p-4 sm:p-6 lg:p-8">
+        {/* Botón hamburguesa para móvil */}
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="lg:hidden fixed top-4 left-4 z-40 p-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 transition"
+        >
+          <i className="fas fa-bars text-xl"></i>
+        </button>
+
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Dashboard Principal</h1>
-          <p className="mt-1 text-sm text-gray-600">
+        <div className="mb-6 sm:mb-8 pt-12 lg:pt-0">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Dashboard Principal</h1>
+          <p className="mt-1 text-xs sm:text-sm text-gray-600">
             Resumen general del negocio - {new Date().toLocaleDateString('es-AR')}
           </p>
         </div>
 
         {/* KPIs */}
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 mb-6 sm:mb-8">
           <KPICard
             title="Ventas Hoy"
             value={`$${kpis.ventas?.hoy?.toLocaleString() || 0}`}
@@ -447,13 +449,6 @@ export default function AdminDashboard() {
             color="green"
           />
           <KPICard
-            title="Usuarios Activos"
-            value={kpis.usuarios?.hoy || 0}
-            change={kpis.usuarios?.cambio}
-            icon="fas fa-users"
-            color="yellow"
-          />
-          <KPICard
             title="Ticket Promedio (Mes)"
             value={`$${kpis.ticket?.hoy?.toLocaleString() || 0}`}
             change={kpis.ticket?.cambio}
@@ -463,11 +458,11 @@ export default function AdminDashboard() {
         </div>
 
         {/* Gráficos */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8 mb-6 sm:mb-8">
           {/* Gráfico de Ventas */}
           <div className="lg:col-span-2">
             <ChartCard title="Ventas Últimos 30 Días (Pagos Aprobados)" icon="fas fa-chart-line">
-              <div className="relative" style={{ height: '300px' }}>
+              <div className="relative" style={{ height: '250px', minHeight: '250px' }}>
                 <Line data={ventasChartData} options={ventasChartOptions} />
               </div>
             </ChartCard>
@@ -475,12 +470,12 @@ export default function AdminDashboard() {
 
           {/* Top 5 Productos Más Vendidos */}
           <ChartCard title="Top 5 Productos Más Vendidos" icon="fas fa-trophy" iconColor="yellow">
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {topProductos.length > 0 ? (
                 topProductos.map((producto, index) => (
                   <div key={producto.producto_id || index} className="flex items-center">
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">
+                      <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">
                         {producto.producto_nombre || 'Sin nombre'}
                       </p>
                       <p className="text-xs text-gray-500">
@@ -488,14 +483,14 @@ export default function AdminDashboard() {
                       </p>
                     </div>
                     <div className="ml-2 flex-shrink-0">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      <span className="inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                         ${producto.ingresos?.toLocaleString() || 0}
                       </span>
                     </div>
                   </div>
                 ))
               ) : (
-                <p className="text-sm text-gray-500 text-center py-4">
+                <p className="text-xs sm:text-sm text-gray-500 text-center py-4">
                   No hay datos disponibles
                 </p>
               )}
@@ -504,10 +499,10 @@ export default function AdminDashboard() {
         </div>
 
         {/* Widgets adicionales */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
           {/* Stock Bajo - VARIANTES */}
           <ChartCard title="Variantes con Stock Bajo (≤10)" icon="fas fa-exclamation-triangle" iconColor="red">
-            <div className="space-y-3 max-h-64 overflow-y-auto">
+            <div className="space-y-2 sm:space-y-3 max-h-64 overflow-y-auto">
               {variantesStockBajo.length > 0 ? (
                 variantesStockBajo.map((variante) => {
                   // Obtener talla y color de múltiples fuentes posibles
@@ -517,29 +512,29 @@ export default function AdminDashboard() {
                   return (
                     <div
                       key={variante.id}
-                      className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-100"
+                      className="flex items-center justify-between p-2 sm:p-3 bg-red-50 rounded-lg border border-red-100"
                     >
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-900 truncate">
+                        <p className="text-xs sm:text-sm font-semibold text-gray-900 truncate">
                           {variante.producto?.nombre || 'Producto sin nombre'}
                         </p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs px-2 py-0.5 bg-gray-200 rounded-md font-medium text-gray-700">
+                        <div className="flex flex-wrap items-center gap-1 sm:gap-2 mt-1">
+                          <span className="text-xs px-1.5 sm:px-2 py-0.5 bg-gray-200 rounded-md font-medium text-gray-700">
                             Talla: {tallaNombre}
                           </span>
-                          <span className="text-xs px-2 py-0.5 bg-gray-200 rounded-md font-medium text-gray-700">
+                          <span className="text-xs px-1.5 sm:px-2 py-0.5 bg-gray-200 rounded-md font-medium text-gray-700">
                             Color: {colorNombre}
                           </span>
                         </div>
                       </div>
-                      <span className="ml-2 inline-flex items-center px-3 py-1.5 rounded-full text-sm font-bold bg-red-100 text-red-800">
+                      <span className="ml-2 inline-flex items-center px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-bold bg-red-100 text-red-800">
                         {variante.stock}
                       </span>
                     </div>
                   );
                 })
               ) : (
-                <p className="text-sm text-gray-500 text-center py-4">
+                <p className="text-xs sm:text-sm text-gray-500 text-center py-4">
                   ✅ Stock normal en todas las variantes
                 </p>
               )}
@@ -548,39 +543,39 @@ export default function AdminDashboard() {
 
           {/* Ventas por Categoría */}
           <ChartCard title="Categorías vendidas (últimos 30 días)" icon="fas fa-chart-pie">
-            <div className="relative" style={{ height: '250px' }}>
+            <div className="relative" style={{ height: '200px', minHeight: '200px' }}>
               <Doughnut data={categoriasChartData} options={categoriasChartOptions} />
             </div>
           </ChartCard>
 
           {/* Resumen rápido */}
-          <div className="bg-white shadow-lg rounded-lg p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+          <div className="bg-white shadow-lg rounded-lg p-4 sm:p-6">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">
               <i className="fas fa-info-circle text-blue-500 mr-2"></i>
               Resumen Rápido
             </h3>
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Productos activos</span>
-                <span className="text-lg font-semibold">
+                <span className="text-xs sm:text-sm text-gray-600">Productos activos</span>
+                <span className="text-base sm:text-lg font-semibold">
                   {categorias.length * 10}
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Productos inactivos</span>
-                <span className="text-lg font-semibold text-orange-600">
+                <span className="text-xs sm:text-sm text-gray-600">Productos inactivos</span>
+                <span className="text-base sm:text-lg font-semibold text-orange-600">
                   {productosInactivos}
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Variantes sin stock</span>
-                <span className="text-lg font-semibold text-red-600">
+                <span className="text-xs sm:text-sm text-gray-600">Variantes sin stock</span>
+                <span className="text-base sm:text-lg font-semibold text-red-600">
                   {variantesStockBajo.filter((v) => v.stock === 0).length}
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Ventas del mes</span>
-                <span className="text-lg font-semibold text-green-600">
+                <span className="text-xs sm:text-sm text-gray-600">Ventas del mes</span>
+                <span className="text-base sm:text-lg font-semibold text-green-600">
                   ${ventasPorPagos.reduce((sum, v) => sum + v.total, 0).toLocaleString()}
                 </span>
               </div>
