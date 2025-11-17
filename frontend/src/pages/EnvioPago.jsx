@@ -42,16 +42,21 @@ const getAuthUser = () => {
 export default function EnvioPago() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [loadingDireccion, setLoadingDireccion] = useState(false);
   const [error, setError] = useState(null);
   const [tipoEntrega, setTipoEntrega] = useState('retiro');
   const [cart, setCart] = useState([]);
   const [pedidoCreado, setPedidoCreado] = useState(null);
+  const [direccionCargada, setDireccionCargada] = useState(false);
+  const [direccionId, setDireccionId] = useState(null);
 
   const [direccion, setDireccion] = useState({
     calle: '',
     numero: '',
     piso_depto: '',
-    ciudad: 'Corrientes'
+    ciudad: 'Corrientes',
+    provincia: 'Corrientes',
+    codigo_postal: '3400'
   });
 
   useEffect(() => {
@@ -73,6 +78,138 @@ export default function EnvioPago() {
 
     setCart(cartData);
   }, [navigate]);
+
+  // ✅ Cargar dirección cuando cambia a envío
+  useEffect(() => {
+    if (tipoEntrega === 'envio' && !direccionCargada) {
+      cargarDireccionUsuario();
+    }
+  }, [tipoEntrega]);
+
+  const cargarDireccionUsuario = async () => {
+    try {
+      setLoadingDireccion(true);
+      const token = getAuthToken();
+      const user = getAuthUser();
+
+      if (!token || !user.id) {
+        console.log('⚠️ No hay token o user.id');
+        setLoadingDireccion(false);
+        return;
+      }
+
+      console.log('🔍 Buscando direcciones del usuario ID:', user.id);
+
+      // ✅ Filtrar por usuario en la petición
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/usuarios/direccion/?usuario=${user.id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // El backend puede devolver un array directamente o un objeto con results
+        const direcciones = Array.isArray(data) ? data : (data.results || []);
+        
+        console.log('📍 Direcciones encontradas:', direcciones);
+
+        if (direcciones && direcciones.length > 0) {
+          // Buscar dirección predeterminada o usar la primera
+          const direccionPrincipal = direcciones.find(d => d.es_predeterminada) || direcciones[0];
+          
+          console.log('✅ Dirección seleccionada:', direccionPrincipal);
+          
+          setDireccion({
+            calle: direccionPrincipal.calle || '',
+            numero: direccionPrincipal.numero || '',
+            piso_depto: direccionPrincipal.piso_depto || '',
+            ciudad: direccionPrincipal.ciudad || 'Corrientes',
+            provincia: direccionPrincipal.provincia || 'Corrientes',
+            codigo_postal: direccionPrincipal.codigo_postal || '3400'
+          });
+          
+          setDireccionId(direccionPrincipal.id);
+          setDireccionCargada(true);
+        } else {
+          console.log('ℹ️ Usuario sin direcciones guardadas');
+          setDireccionCargada(true); // Marcar como cargada aunque no haya direcciones
+        }
+      } else {
+        console.error('❌ Error en la respuesta:', response.status);
+      }
+    } catch (error) {
+      console.error('❌ Error cargando dirección:', error);
+    } finally {
+      setLoadingDireccion(false);
+    }
+  };
+
+  const guardarOActualizarDireccion = async () => {
+    try {
+      const token = getAuthToken();
+      
+      // Determinar provincia y código postal según ciudad
+      let provincia = 'Corrientes';
+      let codigo_postal = '3400';
+      
+      if (direccion.ciudad === 'Resistencia') {
+        provincia = 'Chaco';
+        codigo_postal = '3500';
+      }
+
+      const direccionData = {
+        calle: direccion.calle,
+        numero: direccion.numero,
+        piso_depto: direccion.piso_depto || '',
+        ciudad: direccion.ciudad,
+        provincia: provincia,
+        codigo_postal: codigo_postal,
+        es_predeterminada: true
+      };
+
+      let response;
+
+      if (direccionId) {
+        // Actualizar dirección existente
+        console.log('🔄 Actualizando dirección:', direccionId);
+        response = await fetch(`${import.meta.env.VITE_API_URL}/usuarios/direccion/${direccionId}/`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(direccionData)
+        });
+      } else {
+        // Crear nueva dirección
+        console.log('➕ Creando nueva dirección');
+        response = await fetch(`${import.meta.env.VITE_API_URL}/usuarios/direccion/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(direccionData)
+        });
+      }
+
+      if (response.ok) {
+        const direccionGuardada = await response.json();
+        setDireccionId(direccionGuardada.id);
+        setDireccionCargada(true);
+        console.log('✅ Dirección guardada/actualizada:', direccionGuardada);
+        return direccionGuardada;
+      } else {
+        const errorData = await response.json();
+        console.error('❌ Error al guardar dirección:', errorData);
+        throw new Error('Error al guardar la dirección');
+      }
+    } catch (error) {
+      console.error('❌ Error en guardarOActualizarDireccion:', error);
+      throw error;
+    }
+  };
 
   const crearPedidoConMetodoPago = async (metodoPago) => {
     try {
@@ -101,6 +238,15 @@ export default function EnvioPago() {
         }
         if (!direccion.numero.trim()) {
           alert('Por favor ingresa el número');
+          setLoading(false);
+          return null;
+        }
+
+        // Guardar o actualizar la dirección en la BD
+        try {
+          await guardarOActualizarDireccion();
+        } catch (error) {
+          alert('Error al guardar la dirección. Intenta de nuevo.');
           setLoading(false);
           return null;
         }
@@ -139,11 +285,21 @@ export default function EnvioPago() {
       };
 
       if (tipoEntrega === 'envio') {
+        let provincia = 'Corrientes';
+        let codigo_postal = '3400';
+        
+        if (direccion.ciudad === 'Resistencia') {
+          provincia = 'Chaco';
+          codigo_postal = '3500';
+        }
+
         pedidoPayload.direccion = {
           calle: direccion.calle,
           numero: direccion.numero,
           piso_depto: direccion.piso_depto || '',
-          ciudad: direccion.ciudad
+          ciudad: direccion.ciudad,
+          provincia: provincia,
+          codigo_postal: codigo_postal
         };
       }
 
@@ -191,11 +347,12 @@ export default function EnvioPago() {
     localStorage.setItem('ultimo_pago', JSON.stringify({
       payment_id: `LOCAL-${pedido.id}`,
       status: 'pending',
-      payment_method_id: 'efectivo_local'
+      payment_method_id: 'efectivo_local',
+      tipo_entrega: 'retiro'
     }));
 
     localStorage.removeItem('cart');
-    navigate(`/pago-pendiente?payment_id=LOCAL-${pedido.id}&external_reference=${pedido.id}&type=local`);
+    navigate(`/pago-pendiente?payment_id=LOCAL-${pedido.id}&external_reference=${pedido.id}&type=local&tipo_entrega=retiro`);
   };
 
   const handlePagoOnline = async () => {
@@ -217,10 +374,9 @@ export default function EnvioPago() {
     try {
       const token = getAuthToken();
       
-      // Mapear estados de MercadoPago a estados del modelo Pedido
       let estadoPago = 'pendiente';
       if (result.status === 'approved') {
-        estadoPago = 'pagado';  // ✅ Cambio de 'aprobado' a 'pagado'
+        estadoPago = 'pagado';
       } else if (result.status === 'rejected') {
         estadoPago = 'rechazado';
       }
@@ -250,13 +406,16 @@ export default function EnvioPago() {
       console.error('❌ Error al actualizar estado del pago:', error);
     }
 
-    localStorage.setItem('ultimo_pago', JSON.stringify(result));
+    localStorage.setItem('ultimo_pago', JSON.stringify({
+      ...result,
+      tipo_entrega: tipoEntrega
+    }));
     localStorage.removeItem('cart');
 
     if (result.status === 'approved') {
-      navigate(`/compra-exitosa?payment_id=${result.payment_id || result.id}&external_reference=${pedidoCreado.id}`);
+      navigate(`/compra-exitosa?payment_id=${result.payment_id || result.id}&external_reference=${pedidoCreado.id}&tipo_entrega=${tipoEntrega}`);
     } else if (result.status === 'pending' || result.status === 'in_process') {
-      navigate(`/pago-pendiente?payment_id=${result.payment_id || result.id}&external_reference=${pedidoCreado.id}`);
+      navigate(`/pago-pendiente?payment_id=${result.payment_id || result.id}&external_reference=${pedidoCreado.id}&tipo_entrega=${tipoEntrega}`);
     } else {
       navigate(`/pago-fallido?payment_id=${result.payment_id || result.id}&external_reference=${pedidoCreado.id}`);
     }
@@ -344,7 +503,20 @@ export default function EnvioPago() {
 
             {tipoEntrega === 'envio' && (
               <div className="mb-6 border rounded-lg p-4 bg-yellow-50">
-                <h4 className="font-semibold mb-3">Dirección de envío:</h4>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-semibold">Dirección de envío:</h4>
+                  {loadingDireccion ? (
+                    <span className="text-xs text-gray-500 flex items-center">
+                      <i className="fas fa-spinner fa-spin mr-1"></i>
+                      Cargando...
+                    </span>
+                  ) : direccionCargada && direccionId ? (
+                    <span className="text-xs text-green-600 flex items-center">
+                      <i className="fas fa-check-circle mr-1"></i>
+                      Guardada
+                    </span>
+                  ) : null}
+                </div>
                 <div className="space-y-3">
                   <div>
                     <label className="block text-sm font-medium mb-1">Calle *</label>
@@ -356,7 +528,7 @@ export default function EnvioPago() {
                       className="w-full border rounded px-3 py-2"
                       placeholder="Ej: San Martín"
                       required
-                      disabled={loading || pedidoCreado}
+                      disabled={loading || pedidoCreado || loadingDireccion}
                     />
                   </div>
 
@@ -371,7 +543,7 @@ export default function EnvioPago() {
                         className="w-full border rounded px-3 py-2"
                         placeholder="1234"
                         required
-                        disabled={loading || pedidoCreado}
+                        disabled={loading || pedidoCreado || loadingDireccion}
                       />
                     </div>
 
@@ -384,7 +556,7 @@ export default function EnvioPago() {
                         onChange={handleDireccionChange}
                         className="w-full border rounded px-3 py-2"
                         placeholder="Opcional"
-                        disabled={loading || pedidoCreado}
+                        disabled={loading || pedidoCreado || loadingDireccion}
                       />
                     </div>
                   </div>
@@ -397,12 +569,18 @@ export default function EnvioPago() {
                       onChange={handleDireccionChange}
                       className="w-full border rounded px-3 py-2"
                       required
-                      disabled={loading || pedidoCreado}
+                      disabled={loading || pedidoCreado || loadingDireccion}
                     >
                       <option value="Corrientes">Corrientes (CP: 3400)</option>
                       <option value="Resistencia">Resistencia (CP: 3500)</option>
                     </select>
                   </div>
+
+                  {direccionCargada && direccionId && !pedidoCreado && (
+                    <p className="text-xs text-gray-600 italic">
+                      💡 Los cambios se guardarán automáticamente al confirmar
+                    </p>
+                  )}
                 </div>
               </div>
             )}
@@ -504,6 +682,7 @@ export default function EnvioPago() {
 
                 <p className="text-xs text-gray-500 mt-4 text-center">
                   Al confirmar se creará tu pedido
+                  {tipoEntrega === 'envio' && ' y se guardará tu dirección'}
                 </p>
               </>
             ) : (
