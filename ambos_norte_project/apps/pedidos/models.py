@@ -14,12 +14,24 @@ class Pedido(models.Model):
         ('entregado', 'Entregado'),
         ('cancelado', 'Cancelado'),
     ]
-    
+
+    METODO_PAGO_CHOICES = [
+        ('efectivo', 'Efectivo en local'),
+        ('mercadopago', 'Mercado Pago'),
+        ('transferencia', 'Transferencia'),
+    ]
+
+    ESTADO_PAGO_CHOICES = [
+        ('pendiente', 'Pendiente'),
+        ('pagado', 'Pagado'),
+        ('rechazado', 'Rechazado'),
+    ]
+
     numero_pedido = models.CharField(max_length=50)
     usuario = models.ForeignKey(
-        settings.AUTH_USER_MODEL, 
-        on_delete=models.SET_NULL, 
-        null=True, 
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
         blank=True,
         related_name='pedidos'
     )
@@ -30,23 +42,39 @@ class Pedido(models.Model):
         null=True,
         blank=True
     )
-    
+
     email_contacto = models.EmailField()
     telefono_contacto = models.CharField(max_length=50)
-    
+
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
     total = models.DecimalField(max_digits=10, decimal_places=2)
-    
+
     estado = models.CharField(
-        max_length=20, 
-        choices=ESTADO_CHOICES, 
+        max_length=20,
+        choices=ESTADO_CHOICES,
         default='en_preparacion'
     )
+
+    # Nuevos campos para pagos
+    metodo_pago = models.CharField(
+        max_length=20,
+        choices=METODO_PAGO_CHOICES,
+        default='mercadopago',
+        help_text='Método de pago utilizado'
+    )
+
+    estado_pago = models.CharField(
+        max_length=20,
+        choices=ESTADO_PAGO_CHOICES,
+        default='pendiente',
+        help_text='Estado del pago del pedido'
+    )
+
     notas = models.TextField(blank=True, null=True)
-    
+
     # Campo para soft delete
     activo = models.BooleanField(default=True)
-    
+
     fecha_pedido = models.DateTimeField(auto_now_add=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)
     

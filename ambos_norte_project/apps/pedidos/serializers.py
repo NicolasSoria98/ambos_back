@@ -69,9 +69,10 @@ class PedidoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Pedido
         fields = [
-            'id', 'numero_pedido', 'usuario', 'usuario_nombre', 'email_contacto', 
+            'id', 'numero_pedido', 'usuario', 'usuario_nombre', 'email_contacto',
             'telefono_contacto', 'subtotal', 'total', 'costo_envio', 'estado', 'estado_pedido',
-            'notas', 'fecha_pedido', 'activo', 'items', 'direccion_info', 'total_items'
+            'notas', 'fecha_pedido', 'activo', 'items', 'direccion_info', 'total_items',
+            'metodo_pago', 'estado_pago'
         ]
         read_only_fields = [
             'id', 'numero_pedido', 'usuario', 'subtotal', 'total', 'estado',
@@ -108,10 +109,27 @@ class CrearPedidoSerializer(serializers.Serializer):
     notas = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     total = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
     envio = serializers.DictField(required=False)
+    direccion = serializers.DictField(required=False, allow_null=True)
+    metodo_pago = serializers.ChoiceField(
+        choices=['efectivo', 'mercadopago', 'transferencia'],
+        default='mercadopago',
+        required=False
+    )
+    estado_pago = serializers.ChoiceField(
+        choices=['pendiente', 'pagado', 'rechazado'],
+        default='pendiente',
+        required=False
+    )
 
     def validate(self, attrs):
         if not attrs.get('items'):
             raise serializers.ValidationError('items es requerido')
+
+        # Validar que si es envío, debe haber dirección
+        envio = attrs.get('envio') or {}
+        if envio.get('tipo') == 'envio' and not attrs.get('direccion'):
+            raise serializers.ValidationError('direccion es requerida para envío a domicilio')
+
         return attrs
 
     def create(self, validated_data):
@@ -121,8 +139,34 @@ class CrearPedidoSerializer(serializers.Serializer):
         contacto = validated_data.get('contacto') or {}
         notas = validated_data.get('notas') or ''
         envio = validated_data.get('envio') or {}
+        direccion_data = validated_data.get('direccion')
+        metodo_pago = validated_data.get('metodo_pago', 'mercadopago')
+        estado_pago = validated_data.get('estado_pago', 'pendiente')
 
         with transaction.atomic():
+            # Crear o buscar dirección si es envío a domicilio
+            direccion_obj = None
+            if envio.get('tipo') == 'envio' and direccion_data and user:
+                # Mapeo de ciudad a código postal y provincia
+                ciudad_map = {
+                    'Corrientes': {'codigo_postal': '3400', 'provincia': 'Corrientes'},
+                    'Resistencia': {'codigo_postal': '3500', 'provincia': 'Chaco'}
+                }
+
+                ciudad = direccion_data.get('ciudad', '')
+                ciudad_info = ciudad_map.get(ciudad, {})
+
+                # Crear nueva dirección
+                direccion_obj = Direccion.objects.create(
+                    usuario=user,
+                    calle=direccion_data.get('calle', ''),
+                    numero=direccion_data.get('numero', ''),
+                    piso_depto=direccion_data.get('piso_depto', ''),
+                    ciudad=ciudad,
+                    provincia=ciudad_info.get('provincia', ''),
+                    codigo_postal=ciudad_info.get('codigo_postal', ''),
+                    es_predeterminada=False
+                )
             detalles_items = [] 
             subtotal = Decimal('0.00')
             
@@ -183,11 +227,14 @@ class CrearPedidoSerializer(serializers.Serializer):
             pedido = Pedido.objects.create(
                 numero_pedido=numero_pedido,
                 usuario=user,
+                direccion=direccion_obj,
                 email_contacto=contacto.get('email') or (user.email if user else ''),
                 telefono_contacto=contacto.get('telefono') or '',
                 subtotal=subtotal,
                 total=total,
                 notas=notas,
+                metodo_pago=metodo_pago,
+                estado_pago=estado_pago,
             )
 
             # Crear items del pedido
