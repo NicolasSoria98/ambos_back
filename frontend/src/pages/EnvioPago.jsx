@@ -2,10 +2,45 @@ import { initMercadoPago } from '@mercadopago/sdk-react';
 import PaymentBrick from '../components/PaymentBrick';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import authService from '../services/auth';
 
 initMercadoPago('TEST-4aa13959-24eb-4a20-8858-fbc57f97deb1');
 
 const COSTO_ENVIO = 2000;
+
+// ✅ Función para obtener el token correctamente
+const getAuthToken = () => {
+  const clientToken = authService.getClienteToken();
+  if (clientToken) return clientToken;
+
+  const adminToken = authService.getAdminToken();
+  if (adminToken) return adminToken;
+
+  return (
+    localStorage.getItem("client_authToken") ||
+    localStorage.getItem("admin_authToken") ||
+    localStorage.getItem("clientAuthToken") ||
+    localStorage.getItem("authToken") ||
+    null
+  );
+};
+
+// ✅ Función para obtener el usuario correctamente
+const getAuthUser = () => {
+  const clientUser = authService.getClienteUser();
+  if (clientUser) return clientUser;
+
+  const adminUser = authService.getAdminUser();
+  if (adminUser) return adminUser;
+
+  // Fallback manual
+  try {
+    const userStr = localStorage.getItem('client_user') || localStorage.getItem('admin_user') || localStorage.getItem('user');
+    return userStr ? JSON.parse(userStr) : {};
+  } catch {
+    return {};
+  }
+};
 
 export default function EnvioPago() {
   const navigate = useNavigate();
@@ -31,9 +66,16 @@ export default function EnvioPago() {
         return;
       }
 
-      const token = localStorage.getItem('authToken');
-      const userRaw = localStorage.getItem('user');
-      const user = userRaw ? JSON.parse(userRaw) : {};
+      // ✅ Obtener token y usuario usando las funciones correctas
+      const token = getAuthToken();
+      const user = getAuthUser();
+      
+      // ✅ Verificar que el usuario esté autenticado
+      if (!token) {
+        alert('Debes iniciar sesión para realizar una compra');
+        navigate('/registro');
+        return;
+      }
       
       const items = cart.map(item => ({
         producto_id: item.id,
@@ -67,12 +109,13 @@ export default function EnvioPago() {
       };
 
       console.log('📤 Creando pedido:', pedidoPayload);
+      console.log('🔑 Token usado:', token ? 'Token presente' : 'Sin token');
 
       const response = await fetch(`${import.meta.env.VITE_API_URL}/pedidos/pedido/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` })
+          'Authorization': `Bearer ${token}` // ✅ Siempre enviar el token
         },
         body: JSON.stringify(pedidoPayload)
       });
