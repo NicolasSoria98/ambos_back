@@ -26,6 +26,7 @@ ChartJS.register(
 );
 
 const AdminGoogle = () => {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [geoCodes, setGeoCodes] = useState({ paises: [], regiones: {} });
   const [selectedPais, setSelectedPais] = useState('AR');
@@ -267,30 +268,38 @@ const AdminGoogle = () => {
 
   return (
     <div className="flex min-h-screen bg-gray-50">
-      <AdminSidebar />
+      <AdminSidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
 
-      <main className="flex-1 p-8">
+      {/* Botón hamburguesa para móvil */}
+      <button
+        onClick={() => setSidebarOpen(true)}
+        className="lg:hidden fixed top-4 left-4 z-40 p-2 rounded-md bg-indigo-600 text-white shadow-lg hover:bg-indigo-700 transition-colors"
+      >
+        <i className="fas fa-bars text-xl"></i>
+      </button>
+
+      <main className="flex-1 p-4 sm:p-6 lg:p-8 lg:ml-0">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            <i className="fas fa-search mr-3"></i>
+        <div className="mb-6 sm:mb-8 mt-12 lg:mt-0">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
+            <i className="fas fa-search mr-2 sm:mr-3"></i>
             Análisis de Búsquedas en Google
           </h1>
-          <p className="text-gray-600">
+          <p className="text-sm sm:text-base text-gray-600">
             Descubre qué están buscando los usuarios en Google - Datos en tiempo real
           </p>
         </div>
 
         {/* Panel de Configuración */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">
+        <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6">
+          <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-4">
             <i className="fas fa-cog mr-2"></i>
             Configurar Búsqueda
           </h2>
 
           {/* Keywords */}
           <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
               Palabras Clave (máximo 5)
             </label>
             
@@ -299,7 +308,7 @@ const AdminGoogle = () => {
               {keywords.filter(k => k.trim()).map((kw, index) => (
                 <div
                   key={index}
-                  className="flex items-center gap-2 bg-blue-100 text-blue-800 px-3 py-1 rounded-full"
+                  className="flex items-center gap-2 bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm"
                 >
                   <span>{kw}</span>
                   <button
@@ -315,7 +324,7 @@ const AdminGoogle = () => {
             {/* Input para nueva keyword */}
             {keywords.filter(k => k.trim()).length < 5 && (
               <div className="relative">
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <div className="flex-1 relative">
                     <input
                       type="text"
@@ -328,7 +337,7 @@ const AdminGoogle = () => {
                         }
                       }}
                       placeholder="Escribe una palabra clave..."
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     />
                     {buscandoSugerencias && (
                       <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
@@ -339,7 +348,7 @@ const AdminGoogle = () => {
                   <button
                     onClick={handleAgregarKeyword}
                     disabled={!keywordInput.trim()}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg transition-colors"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white text-sm rounded-lg transition-colors"
                   >
                     <i className="fas fa-plus mr-2"></i>
                     Agregar
@@ -355,7 +364,7 @@ const AdminGoogle = () => {
                         onClick={() => handleSeleccionarSugerencia(sug)}
                         className="px-4 py-2 hover:bg-gray-100 cursor-pointer border-b last:border-b-0"
                       >
-                        <div className="font-medium">{sug.title}</div>
+                        <div className="font-medium text-sm">{sug.title}</div>
                         {sug.type && (
                           <div className="text-xs text-gray-500">{sug.type}</div>
                         )}
@@ -377,13 +386,13 @@ const AdminGoogle = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             {/* País */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
                 País
               </label>
               <select
                 value={selectedPais}
                 onChange={(e) => setSelectedPais(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               >
                 {geoCodes.paises.map(pais => (
                   <option key={pais.codigo} value={pais.codigo}>
@@ -395,13 +404,13 @@ const AdminGoogle = () => {
 
             {/* Región/Ciudad */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
                 Región/Provincia (opcional)
               </label>
               <select
                 value={selectedRegion}
                 onChange={(e) => setSelectedRegion(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 disabled={regionesDisponibles.length === 0}
               >
                 <option value="">Todo el país</option>
@@ -415,7 +424,7 @@ const AdminGoogle = () => {
 
             {/* Fecha Inicio */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
                 Fecha Inicio
               </label>
               <input
@@ -423,13 +432,13 @@ const AdminGoogle = () => {
                 value={fechaInicio}
                 onChange={(e) => setFechaInicio(e.target.value)}
                 max={fechaFin}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
             {/* Fecha Fin */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
                 Fecha Fin
               </label>
               <input
@@ -438,7 +447,7 @@ const AdminGoogle = () => {
                 onChange={(e) => setFechaFin(e.target.value)}
                 min={fechaInicio}
                 max={hoy}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               />
             </div>
           </div>
@@ -448,7 +457,7 @@ const AdminGoogle = () => {
             <button
               onClick={handleConsultar}
               disabled={loading || keywords.filter(k => k.trim()).length === 0}
-              className="px-6 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-lg font-semibold transition-colors"
+              className="px-4 sm:px-6 py-2 sm:py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white text-sm sm:text-base rounded-lg font-semibold transition-colors"
             >
               {loading ? (
                 <>
@@ -469,33 +478,33 @@ const AdminGoogle = () => {
         {resultados && (
           <>
             {/* Resumen */}
-            <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">
+            <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-4">
                 <i className="fas fa-info-circle mr-2"></i>
                 Resumen de Consulta
               </h3>
               
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-600">
+                  <div className="text-xl sm:text-2xl font-bold text-blue-600">
                     {resultados.resumen.keywords_analizadas}
                   </div>
-                  <div className="text-sm text-gray-600">Keywords</div>
+                  <div className="text-xs sm:text-sm text-gray-600">Keywords</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600">
+                  <div className="text-xl sm:text-2xl font-bold text-green-600">
                     {resultados.resumen.regiones_con_datos}
                   </div>
-                  <div className="text-sm text-gray-600">Regiones</div>
+                  <div className="text-xs sm:text-sm text-gray-600">Regiones</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-sm font-semibold text-gray-700">
+                  <div className="text-xs sm:text-sm font-semibold text-gray-700">
                     {resultados.resumen.periodo}
                   </div>
                   <div className="text-xs text-gray-600">Período</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-sm font-semibold text-gray-700">
+                  <div className="text-xs sm:text-sm font-semibold text-gray-700">
                     {resultados.resumen.region}
                   </div>
                   <div className="text-xs text-gray-600">Ubicación</div>
@@ -507,11 +516,11 @@ const AdminGoogle = () => {
             {resultados.resumen.promedios && Object.keys(resultados.resumen.promedios).length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
                 {Object.entries(resultados.resumen.promedios).map(([kw, metricas]) => (
-                  <div key={kw} className="bg-white rounded-lg shadow-md p-6">
-                    <h4 className="font-semibold text-gray-800 mb-3 truncate" title={kw}>
+                  <div key={kw} className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+                    <h4 className="font-semibold text-sm sm:text-base text-gray-800 mb-3 truncate" title={kw}>
                       "{kw}"
                     </h4>
-                    <div className="space-y-2 text-sm">
+                    <div className="space-y-2 text-xs sm:text-sm">
                       <div className="flex justify-between">
                         <span className="text-gray-600">Promedio:</span>
                         <span className="font-semibold text-blue-600">
@@ -537,13 +546,13 @@ const AdminGoogle = () => {
             )}
 
             {/* Gráfico de Tendencia Temporal */}
-            <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">
+            <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-4">
                 <i className="fas fa-chart-line mr-2"></i>
                 Tendencia de Búsquedas en el Tiempo
               </h3>
               {getTendenciaChart() ? (
-                <div className="h-96">
+                <div className="h-64 sm:h-80 lg:h-96">
                   <Line
                     data={getTendenciaChart()}
                     options={{
@@ -552,6 +561,11 @@ const AdminGoogle = () => {
                       plugins: {
                         legend: {
                           position: 'top',
+                          labels: {
+                            boxWidth: 12,
+                            padding: 10,
+                            font: { size: 11 }
+                          }
                         },
                         tooltip: {
                           mode: 'index',
@@ -563,13 +577,15 @@ const AdminGoogle = () => {
                           beginAtZero: true,
                           title: {
                             display: true,
-                            text: 'Interés (0-100)'
+                            text: 'Interés (0-100)',
+                            font: { size: 11 }
                           }
                         },
                         x: {
                           title: {
                             display: true,
-                            text: 'Fecha'
+                            text: 'Fecha',
+                            font: { size: 11 }
                           }
                         }
                       }
@@ -577,10 +593,10 @@ const AdminGoogle = () => {
                   />
                 </div>
               ) : (
-                <p className="text-gray-500 text-center py-8">No hay datos de tendencia disponibles</p>
+                <p className="text-gray-500 text-center py-8 text-sm">No hay datos de tendencia disponibles</p>
               )}
               <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                <p className="text-sm text-gray-700">
+                <p className="text-xs sm:text-sm text-gray-700">
                   <i className="fas fa-info-circle mr-2"></i>
                   Los valores representan el interés de búsqueda relativo al punto más alto del gráfico (100).
                   Un valor de 50 significa que el término es la mitad de popular.
@@ -590,15 +606,15 @@ const AdminGoogle = () => {
 
             {/* Gráfico de Barras Regional */}
             {resultados.datos_regionales && resultados.datos_regionales.length > 0 && (
-              <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-semibold text-gray-800">
+              <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-800">
                     <i className="fas fa-chart-bar mr-2"></i>
                     Comparación por Región
                   </h3>
                   <button
                     onClick={() => setShowRegionalMap(!showRegionalMap)}
-                    className="px-4 py-2 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg transition-colors"
+                    className="px-3 sm:px-4 py-2 bg-blue-100 text-blue-700 hover:bg-blue-200 text-xs sm:text-sm rounded-lg transition-colors"
                   >
                     <i className={`fas fa-${showRegionalMap ? 'chart-bar' : 'table'} mr-2`}></i>
                     {showRegionalMap ? 'Ver Gráfico' : 'Ver Tabla'}
@@ -608,14 +624,14 @@ const AdminGoogle = () => {
                 {showRegionalMap ? (
                   /* Tabla de datos regionales */
                   <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
+                    <table className="min-w-full divide-y divide-gray-200" style={{ minWidth: '600px' }}>
                       <thead className="bg-gray-50">
                         <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                             Región
                           </th>
                           {keywords.filter(k => k.trim()).map(kw => (
-                            <th key={kw} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                            <th key={kw} className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                               {kw}
                             </th>
                           ))}
@@ -624,7 +640,7 @@ const AdminGoogle = () => {
                       <tbody className="bg-white divide-y divide-gray-200">
                         {resultados.datos_regionales.slice(0, 20).map((region, idx) => (
                           <tr key={idx} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-gray-900">
                               {region.geoName || region.geoCode}
                             </td>
                             {keywords.filter(k => k.trim()).map(kw => {
@@ -635,7 +651,7 @@ const AdminGoogle = () => {
                               return (
                                 <td 
                                   key={kw} 
-                                  className="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
+                                  className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900"
                                   style={{ backgroundColor: bgColor }}
                                 >
                                   <span className="font-semibold">{valor}</span>
@@ -651,7 +667,7 @@ const AdminGoogle = () => {
                   /* Gráfico de barras comparativo */
                   getRegionalChart() && (
                     <>
-                      <div className="h-96">
+                      <div className="h-64 sm:h-80 lg:h-96">
                         <Bar
                           data={getRegionalChart()}
                           options={{
@@ -661,8 +677,9 @@ const AdminGoogle = () => {
                               legend: {
                                 position: 'top',
                                 labels: {
-                                  boxWidth: 15,
-                                  padding: 15
+                                  boxWidth: 12,
+                                  padding: 10,
+                                  font: { size: 11 }
                                 }
                               },
                               tooltip: {
@@ -679,13 +696,15 @@ const AdminGoogle = () => {
                                 max: 100,
                                 title: {
                                   display: true,
-                                  text: 'Interés Relativo (0-100)'
+                                  text: 'Interés Relativo (0-100)',
+                                  font: { size: 11 }
                                 }
                               },
                               x: {
                                 title: {
                                   display: true,
-                                  text: 'Región'
+                                  text: 'Región',
+                                  font: { size: 11 }
                                 }
                               }
                             }
@@ -693,7 +712,7 @@ const AdminGoogle = () => {
                         />
                       </div>
                       <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                        <p className="text-sm text-gray-700">
+                        <p className="text-xs sm:text-sm text-gray-700">
                           <i className="fas fa-info-circle mr-2"></i>
                           Este gráfico muestra las {keywords.filter(k => k.trim()).length > 1 ? 'palabras clave' : 'la palabra clave'} comparadas 
                           en las top 10 regiones con mayor interés promedio. 
@@ -708,10 +727,10 @@ const AdminGoogle = () => {
 
             {/* Consultas Relacionadas */}
             {resultados.consultas_relacionadas && Object.keys(resultados.consultas_relacionadas).length > 0 && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                 {Object.entries(resultados.consultas_relacionadas).map(([kw, queries]) => (
-                  <div key={kw} className="bg-white rounded-lg shadow-md p-6">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                  <div key={kw} className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-4">
                       <i className="fas fa-link mr-2"></i>
                       Consultas Relacionadas: "{kw}"
                     </h3>
@@ -719,12 +738,12 @@ const AdminGoogle = () => {
                     {/* Top queries */}
                     {queries.top && queries.top.length > 0 && (
                       <div className="mb-4">
-                        <h4 className="text-sm font-semibold text-gray-700 mb-2">Más populares:</h4>
+                        <h4 className="text-xs sm:text-sm font-semibold text-gray-700 mb-2">Más populares:</h4>
                         <div className="space-y-2">
                           {queries.top.slice(0, 5).map((q, idx) => (
-                            <div key={idx} className="flex justify-between items-center text-sm">
-                              <span className="text-gray-700">{q.query}</span>
-                              <span className="text-blue-600 font-semibold">{q.value}</span>
+                            <div key={idx} className="flex justify-between items-center text-xs sm:text-sm">
+                              <span className="text-gray-700 truncate mr-2">{q.query}</span>
+                              <span className="text-blue-600 font-semibold whitespace-nowrap">{q.value}</span>
                             </div>
                           ))}
                         </div>
@@ -734,14 +753,14 @@ const AdminGoogle = () => {
                     {/* Rising queries */}
                     {queries.rising && queries.rising.length > 0 && (
                       <div>
-                        <h4 className="text-sm font-semibold text-gray-700 mb-2">
+                        <h4 className="text-xs sm:text-sm font-semibold text-gray-700 mb-2">
                           En ascenso: <i className="fas fa-arrow-up text-green-600"></i>
                         </h4>
                         <div className="space-y-2">
                           {queries.rising.slice(0, 5).map((q, idx) => (
-                            <div key={idx} className="flex justify-between items-center text-sm">
-                              <span className="text-gray-700">{q.query}</span>
-                              <span className="text-green-600 font-semibold">
+                            <div key={idx} className="flex justify-between items-center text-xs sm:text-sm">
+                              <span className="text-gray-700 truncate mr-2">{q.query}</span>
+                              <span className="text-green-600 font-semibold whitespace-nowrap">
                                 {q.value === 'Breakout' ? '🔥 Breakout' : `+${q.value}%`}
                               </span>
                             </div>
@@ -758,12 +777,12 @@ const AdminGoogle = () => {
 
         {/* Estado vacío */}
         {!resultados && !loading && (
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-12 text-center">
-            <i className="fas fa-chart-line text-6xl text-gray-300 mb-4"></i>
-            <h3 className="text-xl font-semibold text-gray-700 mb-2">
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 sm:p-12 text-center">
+            <i className="fas fa-chart-line text-4xl sm:text-6xl text-gray-300 mb-4"></i>
+            <h3 className="text-lg sm:text-xl font-semibold text-gray-700 mb-2">
               Comienza tu Análisis
             </h3>
-            <p className="text-gray-600">
+            <p className="text-sm sm:text-base text-gray-600">
               Agrega palabras clave, selecciona ubicación y fechas, luego presiona "Consultar Google Trends"
             </p>
           </div>
