@@ -12,8 +12,8 @@ export default function AdminInventario() {
 
   // Filtros
   const [filtroNombre, setFiltroNombre] = useState('');
-  const [filtroStock, setFiltroStock] = useState('todos'); // 'todos', 'normal', 'bajo'
-  const [ordenamiento, setOrdenamiento] = useState('nombre'); // 'nombre', 'precio', 'stock'
+  const [filtroStock, setFiltroStock] = useState('todos');
+  const [ordenamiento, setOrdenamiento] = useState('nombre');
 
   useEffect(() => {
     loadInventarioData();
@@ -27,12 +27,10 @@ export default function AdminInventario() {
     try {
       setLoading(true);
 
-      // Obtener todas las variantes con información enriquecida
       const variantesEnriquecidas = await productsService.getAllVariantesEnriquecidas();
 
       console.log('✅ Total de variantes cargadas:', variantesEnriquecidas.length);
 
-      // Mapear para agregar información del producto
       const todasVariantes = variantesEnriquecidas.map(variante => ({
         ...variante,
         producto_nombre: variante.producto?.nombre || 'Sin nombre',
@@ -56,21 +54,18 @@ export default function AdminInventario() {
   const aplicarFiltrosYOrdenamiento = () => {
     let resultado = [...variantes];
 
-    // Filtro por nombre
     if (filtroNombre.trim()) {
       resultado = resultado.filter(v => 
         v.producto_nombre.toLowerCase().includes(filtroNombre.toLowerCase())
       );
     }
 
-    // Filtro por stock
     if (filtroStock === 'bajo') {
       resultado = resultado.filter(v => v.stock <= 10);
     } else if (filtroStock === 'normal') {
       resultado = resultado.filter(v => v.stock > 10);
     }
 
-    // Ordenamiento
     resultado.sort((a, b) => {
       switch (ordenamiento) {
         case 'nombre':
@@ -112,8 +107,8 @@ export default function AdminInventario() {
         <AdminSidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-24 w-24 sm:h-32 sm:w-32 border-b-2 border-indigo-600 mx-auto"></div>
-            <p className="mt-4 text-sm sm:text-base text-gray-600">Cargando inventario...</p>
+            <div className="animate-spin rounded-full h-16 w-16 sm:h-24 sm:w-24 border-b-2 border-indigo-600 mx-auto"></div>
+            <p className="mt-4 text-xs sm:text-sm text-gray-600">Cargando inventario...</p>
           </div>
         </div>
       </div>
@@ -129,48 +124,48 @@ export default function AdminInventario() {
         onClick={() => setSidebarOpen(true)}
         className="lg:hidden fixed top-4 left-4 z-40 p-2 rounded-md bg-indigo-600 text-white shadow-lg hover:bg-indigo-700 transition-colors"
       >
-        <i className="fas fa-bars text-xl"></i>
+        <i className="fas fa-bars text-lg"></i>
       </button>
 
-      <main className="flex-1 p-4 sm:p-6 lg:p-8 lg:ml-0">
+      <main className="flex-1 p-3 sm:p-6 lg:p-8 lg:ml-0 overflow-x-hidden">
         {/* Header */}
-        <div className="mb-6 sm:mb-8 mt-12 lg:mt-0">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Gestión de Inventario</h1>
+        <div className="mb-4 sm:mb-6 mt-14 lg:mt-0">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Gestión de Inventario</h1>
           <p className="mt-1 text-xs sm:text-sm text-gray-600">
             Listado completo de productos y variantes
           </p>
         </div>
 
         {/* Filtros y Controles */}
-        <div className="bg-white shadow-lg rounded-lg p-4 sm:p-6 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white shadow-lg rounded-lg p-3 sm:p-4 lg:p-6 mb-4 sm:mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             {/* Filtro por nombre */}
             <div>
-              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
-                <i className="fas fa-search mr-2"></i>
-                Buscar por nombre
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                <i className="fas fa-search mr-1"></i>
+                Buscar
               </label>
               <input
                 type="text"
                 placeholder="Nombre del producto..."
                 value={filtroNombre}
                 onChange={(e) => setFiltroNombre(e.target.value)}
-                className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full px-2 sm:px-3 py-1.5 sm:py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               />
             </div>
 
             {/* Filtro por stock */}
             <div>
-              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
-                <i className="fas fa-filter mr-2"></i>
-                Filtrar por stock
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                <i className="fas fa-filter mr-1"></i>
+                Stock
               </label>
               <select
                 value={filtroStock}
                 onChange={(e) => setFiltroStock(e.target.value)}
-                className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full px-2 sm:px-3 py-1.5 sm:py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               >
-                <option value="todos">Todos los productos</option>
+                <option value="todos">Todos</option>
                 <option value="bajo">Stock bajo (≤10)</option>
                 <option value="normal">Stock normal (&gt;10)</option>
               </select>
@@ -178,25 +173,25 @@ export default function AdminInventario() {
 
             {/* Ordenamiento */}
             <div>
-              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
-                <i className="fas fa-sort mr-2"></i>
-                Ordenar por
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                <i className="fas fa-sort mr-1"></i>
+                Ordenar
               </label>
               <select
                 value={ordenamiento}
                 onChange={(e) => setOrdenamiento(e.target.value)}
-                className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full px-2 sm:px-3 py-1.5 sm:py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               >
                 <option value="nombre">Nombre (A-Z)</option>
-                <option value="precio-menor">Precio (Menor a Mayor)</option>
-                <option value="precio-mayor">Precio (Mayor a Menor)</option>
-                <option value="stock">Stock (Menor a Mayor)</option>
+                <option value="precio-menor">Precio (- a +)</option>
+                <option value="precio-mayor">Precio (+ a -)</option>
+                <option value="stock">Stock (- a +)</option>
               </select>
             </div>
           </div>
 
           {/* Contador de resultados */}
-          <div className="mt-4 text-xs sm:text-sm text-gray-600">
+          <div className="mt-3 text-xs text-gray-600">
             Mostrando <span className="font-semibold">{variantesFiltradas.length}</span> de{' '}
             <span className="font-semibold">{variantes.length}</span> variantes
           </div>
@@ -205,26 +200,26 @@ export default function AdminInventario() {
         {/* Tabla de inventario */}
         <div className="bg-white shadow-lg rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200" style={{ minWidth: '800px' }}>
+            <table className="min-w-full divide-y divide-gray-200" style={{ minWidth: '600px' }}>
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                     Producto
                   </th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                     Talla
                   </th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                     Color
                   </th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                     Stock
                   </th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                     Precio
                   </th>
-                  <th className="px-3 sm:px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Acciones
+                  <th className="px-2 sm:px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">
+                    Acc.
                   </th>
                 </tr>
               </thead>
@@ -232,46 +227,45 @@ export default function AdminInventario() {
                 {variantesFiltradas.length > 0 ? (
                   variantesFiltradas.map((variante, index) => (
                     <tr key={variante.id || index} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-3 sm:px-6 py-4">
-                        <div className="text-xs sm:text-sm font-medium text-gray-900">
+                      <td className="px-2 sm:px-4 py-2">
+                        <div className="text-xs font-medium text-gray-900 truncate max-w-[150px]">
                           {variante.producto_nombre}
                         </div>
                         {variante.producto_categoria && (
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-gray-500 truncate max-w-[150px]">
                             {variante.producto_categoria}
                           </div>
                         )}
                       </td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                        <span className="text-xs sm:text-sm text-gray-700">
+                      <td className="px-2 sm:px-4 py-2 whitespace-nowrap">
+                        <span className="text-xs text-gray-700">
                           {variante.talla_nombre || variante.talla?.nombre || 'N/A'}
                         </span>
                       </td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                        <span className="text-xs sm:text-sm text-gray-700">
+                      <td className="px-2 sm:px-4 py-2 whitespace-nowrap">
+                        <span className="text-xs text-gray-700">
                           {variante.color_nombre || variante.color?.nombre || 'N/A'}
                         </span>
                       </td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                      <td className="px-2 sm:px-4 py-2 whitespace-nowrap">
                         <span
-                          className={`px-2 sm:px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStockBadgeColor(
+                          className={`px-1.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${getStockBadgeColor(
                             variante.stock
                           )}`}
                         >
-                          {variante.stock} unid.
+                          {variante.stock}
                         </span>
                       </td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900">
+                      <td className="px-2 sm:px-4 py-2 whitespace-nowrap text-xs text-gray-900">
                         ${parseFloat(variante.producto_precio || 0).toLocaleString()}
                       </td>
-                      <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-center">
+                      <td className="px-2 sm:px-4 py-2 whitespace-nowrap text-center">
                         <button
                           onClick={() => verDetalles(variante)}
-                          className="inline-flex items-center px-2 sm:px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-medium rounded-md transition-colors"
+                          className="inline-flex items-center px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-md transition-colors"
                         >
-                          <i className="fas fa-eye mr-1 sm:mr-2"></i>
-                          <span className="hidden sm:inline">Ver Detalles</span>
-                          <span className="sm:hidden">Ver</span>
+                          <i className="fas fa-eye"></i>
+                          <span className="hidden sm:inline ml-1">Ver</span>
                         </button>
                       </td>
                     </tr>
@@ -280,8 +274,8 @@ export default function AdminInventario() {
                   <tr>
                     <td colSpan="6" className="px-6 py-8 text-center">
                       <div className="text-gray-500">
-                        <i className="fas fa-inbox text-3xl sm:text-4xl mb-2"></i>
-                        <p className="text-xs sm:text-sm">No se encontraron variantes con los filtros aplicados</p>
+                        <i className="fas fa-inbox text-2xl sm:text-3xl mb-2"></i>
+                        <p className="text-xs">No se encontraron variantes</p>
                       </div>
                     </td>
                   </tr>
@@ -294,43 +288,43 @@ export default function AdminInventario() {
 
       {/* Modal de Detalles */}
       {showModal && selectedVariante && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-0 sm:p-4">
-          <div className="bg-white rounded-none sm:rounded-lg shadow-xl w-full h-full sm:h-auto sm:max-w-2xl sm:max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md sm:max-w-lg max-h-[90vh] overflow-y-auto">
             {/* Header del Modal */}
-            <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 sticky top-0 bg-white z-10">
-              <h3 className="text-lg sm:text-2xl font-bold text-gray-900">
+            <div className="flex items-center justify-between p-3 sm:p-4 border-b border-gray-200 sticky top-0 bg-white z-10">
+              <h3 className="text-base sm:text-lg font-bold text-gray-900">
                 Detalles del Producto
               </h3>
               <button
                 onClick={cerrarModal}
-                className="text-gray-400 hover:text-gray-600 transition-colors p-2"
+                className="text-gray-400 hover:text-gray-600 transition-colors p-1"
               >
-                <i className="fas fa-times text-xl sm:text-2xl"></i>
+                <i className="fas fa-times text-lg"></i>
               </button>
             </div>
 
             {/* Contenido del Modal */}
-            <div className="p-4 sm:p-6">
+            <div className="p-3 sm:p-4">
               {/* Imagen del Producto */}
               {selectedVariante.producto_imagen && (
-                <div className="mb-4 sm:mb-6 flex justify-center">
+                <div className="mb-3 sm:mb-4 flex justify-center">
                   <img
                     src={selectedVariante.producto_imagen}
                     alt={selectedVariante.producto_nombre}
-                    className="max-h-48 sm:max-h-64 w-full object-contain sm:object-cover rounded-lg shadow-md"
+                    className="max-h-32 sm:max-h-48 w-auto object-contain rounded-lg shadow-md"
                   />
                 </div>
               )}
 
               {/* Información Principal */}
-              <div className="space-y-3 sm:space-y-4">
+              <div className="space-y-2 sm:space-y-3">
                 <div>
-                  <h4 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">
+                  <h4 className="text-sm sm:text-base font-semibold text-gray-900 mb-1">
                     {selectedVariante.producto_nombre}
                   </h4>
                   {selectedVariante.producto_categoria && (
-                    <p className="text-xs sm:text-sm text-gray-500">
-                      <i className="fas fa-tag mr-2"></i>
+                    <p className="text-xs text-gray-500">
+                      <i className="fas fa-tag mr-1"></i>
                       {selectedVariante.producto_categoria}
                     </p>
                   )}
@@ -339,30 +333,30 @@ export default function AdminInventario() {
                 {/* Descripción */}
                 {selectedVariante.producto_descripcion && (
                   <div>
-                    <h5 className="text-xs sm:text-sm font-medium text-gray-700 mb-1">Descripción:</h5>
-                    <p className="text-xs sm:text-sm text-gray-600">{selectedVariante.producto_descripcion}</p>
+                    <h5 className="text-xs font-medium text-gray-700 mb-1">Descripción:</h5>
+                    <p className="text-xs text-gray-600 line-clamp-3">{selectedVariante.producto_descripcion}</p>
                   </div>
                 )}
 
                 {/* Grid de Información */}
-                <div className="grid grid-cols-2 gap-3 sm:gap-4 pt-4 border-t">
-                  <div className="bg-gray-50 p-3 sm:p-4 rounded-lg">
-                    <p className="text-xs text-gray-500 mb-1">Talla</p>
-                    <p className="text-base sm:text-lg font-semibold text-gray-900">
+                <div className="grid grid-cols-2 gap-2 sm:gap-3 pt-3 border-t">
+                  <div className="bg-gray-50 p-2 sm:p-3 rounded-lg">
+                    <p className="text-xs text-gray-500 mb-0.5">Talla</p>
+                    <p className="text-sm sm:text-base font-semibold text-gray-900">
                       {selectedVariante.talla_nombre || selectedVariante.talla?.nombre || 'N/A'}
                     </p>
                   </div>
 
-                  <div className="bg-gray-50 p-3 sm:p-4 rounded-lg">
-                    <p className="text-xs text-gray-500 mb-1">Color</p>
-                    <p className="text-base sm:text-lg font-semibold text-gray-900">
+                  <div className="bg-gray-50 p-2 sm:p-3 rounded-lg">
+                    <p className="text-xs text-gray-500 mb-0.5">Color</p>
+                    <p className="text-sm sm:text-base font-semibold text-gray-900">
                       {selectedVariante.color_nombre || selectedVariante.color?.nombre || 'N/A'}
                     </p>
                   </div>
 
-                  <div className="bg-gray-50 p-3 sm:p-4 rounded-lg">
-                    <p className="text-xs text-gray-500 mb-1">Stock Disponible</p>
-                    <p className={`text-base sm:text-lg font-semibold ${
+                  <div className="bg-gray-50 p-2 sm:p-3 rounded-lg">
+                    <p className="text-xs text-gray-500 mb-0.5">Stock</p>
+                    <p className={`text-sm sm:text-base font-semibold ${
                       selectedVariante.stock === 0 ? 'text-red-600' :
                       selectedVariante.stock <= 10 ? 'text-yellow-600' :
                       'text-green-600'
@@ -371,20 +365,20 @@ export default function AdminInventario() {
                     </p>
                   </div>
 
-                  <div className="bg-gray-50 p-3 sm:p-4 rounded-lg">
-                    <p className="text-xs text-gray-500 mb-1">Precio</p>
-                    <p className="text-base sm:text-lg font-semibold text-gray-900">
+                  <div className="bg-gray-50 p-2 sm:p-3 rounded-lg">
+                    <p className="text-xs text-gray-500 mb-0.5">Precio</p>
+                    <p className="text-sm sm:text-base font-semibold text-gray-900">
                       ${parseFloat(selectedVariante.producto_precio || 0).toLocaleString()}
                     </p>
                   </div>
                 </div>
 
                 {/* Estado del Stock */}
-                <div className="pt-4 border-t">
+                <div className="pt-3 border-t">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs sm:text-sm font-medium text-gray-700">Estado:</span>
+                    <span className="text-xs font-medium text-gray-700">Estado:</span>
                     <span
-                      className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold ${
+                      className={`px-2 sm:px-3 py-1 rounded-full text-xs font-semibold ${
                         selectedVariante.stock === 0
                           ? 'bg-red-100 text-red-800'
                           : selectedVariante.stock <= 10
@@ -404,10 +398,10 @@ export default function AdminInventario() {
             </div>
 
             {/* Footer del Modal */}
-            <div className="flex justify-end gap-3 p-4 sm:p-6 border-t border-gray-200 bg-gray-50 sticky bottom-0">
+            <div className="flex justify-end gap-2 p-3 sm:p-4 border-t border-gray-200 bg-gray-50 sticky bottom-0">
               <button
                 onClick={cerrarModal}
-                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm sm:text-base font-medium rounded-lg transition-colors"
+                className="px-3 sm:px-4 py-1.5 sm:py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 text-xs sm:text-sm font-medium rounded-lg transition-colors"
               >
                 Cerrar
               </button>

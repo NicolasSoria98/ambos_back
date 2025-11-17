@@ -9,7 +9,7 @@ ambos_norte/__pycache__/
 media/
 staticfiles/
 static_root/
-
+venv/
 # IDE
 .vscode/
 .idea/

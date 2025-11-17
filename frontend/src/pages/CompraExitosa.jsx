@@ -179,7 +179,7 @@ export default function CompraExitosa() {
         {/* Información adicional */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-left">
           <p className="text-sm text-blue-800">
-            <strong>📧 Te enviamos un correo</strong> con los detalles de tu compra y el comprobante de pago.
+            <strong>📧 Nuestro equipo te contactará en menos de 24hs habiles</strong> para coordinar el envio y entrega de tu producto. Muchas gracias!
           </p>
         </div>
 

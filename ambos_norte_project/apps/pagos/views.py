@@ -86,39 +86,59 @@ def confirmar_pago_mp(request):
         
         estado_pago = estado_mapping.get(mp_status, 'pendiente')
         
-        # Crear o actualizar el pago
-        pago, created = Pago.objects.update_or_create(
-            payment_id=payment_id,
-            defaults={
-                'pedido': pedido,
-                'numero_pedido': pedido.numero_pedido,
-                'monto': request.data.get('transaction_amount', pedido.total),
-                'metodo_pago': 'mercadopago',
-                'estado_pago': estado_pago,
-                'status_detail': request.data.get('status_detail'),
-                'payer_email': request.data.get('payer_email'),
-                'tipo_pago': request.data.get('payment_method_id'),
-                'cuotas': request.data.get('installments', 1),
-                'fecha_pago': timezone.now() if mp_status == 'approved' else None
-            }
-        )
+        # 🔥 CAMBIO CRÍTICO: Buscar el pago existente asociado al pedido
+        try:
+            pago = Pago.objects.get(pedido=pedido)
+            print(f"✅ Pago existente encontrado: ID={pago.id}")
+            
+            # Actualizar el pago existente
+            pago.payment_id = payment_id
+            pago.estado_pago = estado_pago
+            pago.monto = request.data.get('transaction_amount', pedido.total)
+            pago.status_detail = request.data.get('status_detail')
+            pago.payer_email = request.data.get('payer_email')
+            pago.tipo_pago = request.data.get('payment_method_id')
+            pago.cuotas = request.data.get('installments', 1)
+            
+            if mp_status == 'approved':
+                pago.fecha_pago = timezone.now()
+            
+            pago.save()
+            print(f"✅ Pago actualizado: ID={pago.id}, Estado={estado_pago}")
+            created = False
+            
+        except Pago.DoesNotExist:
+            # Si no existe (caso raro), crear uno nuevo
+            print(f"⚠️ No se encontró pago para el pedido {pedido.numero_pedido}, creando uno nuevo")
+            pago = Pago.objects.create(
+                pedido=pedido,
+                numero_pedido=pedido.numero_pedido,
+                payment_id=payment_id,
+                monto=request.data.get('transaction_amount', pedido.total),
+                metodo_pago='mercadopago',
+                estado_pago=estado_pago,
+                status_detail=request.data.get('status_detail'),
+                payer_email=request.data.get('payer_email'),
+                tipo_pago=request.data.get('payment_method_id'),
+                cuotas=request.data.get('installments', 1),
+                fecha_pago=timezone.now() if mp_status == 'approved' else None
+            )
+            print(f"✅ Pago creado: ID={pago.id}, Estado={estado_pago}")
+            created = True
         
-        action_text = "creado" if created else "actualizado"
-        print(f"✅ Pago {action_text}: ID={pago.id}, Estado={estado_pago}")
-        
-        # Si el pago fue aprobado, actualizar estado del pedido
+        # Si el pago fue aprobado, actualizar estado del pedido y su estado_pago
         if estado_pago == 'aprobado':
             estado_anterior = pedido.estado
-            pedido.estado = 'en_preparacion'
+            pedido.estado_pago = 'pagado'  # ✅ Actualizar estado_pago del pedido
             pedido.save()
             
-            print(f"✅ Pedido actualizado: {estado_anterior} → en_preparacion")
+            print(f"✅ Pedido actualizado: estado={pedido.estado}, estado_pago={pedido.estado_pago}")
             
             # Registrar en historial
             HistorialEstadoPedido.objects.create(
                 pedido=pedido,
                 estado_anterior=estado_anterior,
-                estado_nuevo='en_preparacion',
+                estado_nuevo=pedido.estado,
                 usuario_modificador=None,  # Sistema automático
                 comentario=f'Pago aprobado automáticamente - Payment ID: {payment_id}'
             )
@@ -128,7 +148,8 @@ def confirmar_pago_mp(request):
             'pago_id': pago.id,
             'created': created,
             'estado': estado_pago,
-            'pedido_actualizado': pedido.estado if estado_pago == 'aprobado' else None
+            'pedido_actualizado': pedido.estado if estado_pago == 'aprobado' else None,
+            'estado_pago_pedido': pedido.estado_pago
         }, status=status.HTTP_200_OK)
         
     except Exception as e:
