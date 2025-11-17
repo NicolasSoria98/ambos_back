@@ -1,319 +1,164 @@
-from django.shortcuts import render
-from django.conf import settings
-from django.views.decorators.csrf import csrf_exempt
-from django.utils.decorators import method_decorator
 from rest_framework import viewsets, status
-from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
-from decimal import Decimal
-from datetime import datetime
-import mercadopago
-import json
-import traceback
-
+from django.utils import timezone
 from .models import Pago
 from .serializer import PagoSerializer
 from apps.pedidos.models import Pedido, HistorialEstadoPedido
 
-# Inicializar SDK de MercadoPago según documentación oficial
-sdk = mercadopago.SDK(settings.MERCADO_PAGO_ACCESS_TOKEN)
-
-
 class PagoViewSet(viewsets.ModelViewSet):
     """
-    ViewSet para gestionar pagos con integración de MercadoPago Checkout Pro
+    ViewSet para manejar pagos
+    Los pagos se crean desde el servicio de Express/MercadoPago
     """
     queryset = Pago.objects.all()
     serializer_class = PagoSerializer
     
     def get_queryset(self):
-        """Filtra pagos según parámetros"""
-        queryset = Pago.objects.select_related('pedido')
+        queryset = Pago.objects.all()
         
-        # Filtro por pedido
+        # Filtros opcionales
         pedido_id = self.request.query_params.get('pedido', None)
+        estado = self.request.query_params.get('estado', None)
+        payment_id = self.request.query_params.get('payment_id', None)
+        
         if pedido_id:
             queryset = queryset.filter(pedido_id=pedido_id)
-        
-        # Filtro por estado
-        estado = self.request.query_params.get('estado', None)
         if estado:
             queryset = queryset.filter(estado_pago=estado)
-        
-        return queryset.order_by('-fecha_creacion')
+        if payment_id:
+            queryset = queryset.filter(payment_id=payment_id)
+            
+        return queryset
+
+
+@api_view(['POST'])
+def confirmar_pago_mp(request):
+    """
+    Endpoint para que Express notifique cuando un pago fue procesado
     
-    def get_permissions(self):
-        """
-        Define permisos según la acción
-        - crear_preferencia: Usuario autenticado
-        - webhook: Sin autenticación (MercadoPago lo llama)
-        - resto: Admin o usuario autenticado
-        """
-        if self.action == 'crear_preferencia':
-            return [IsAuthenticated()]
-        elif self.action == 'webhook':
-            return [AllowAny()]
-        elif self.action in ['list', 'retrieve']:
-            return [IsAuthenticated()]
-        return [IsAuthenticated(), IsAdminUser()]
-    
-    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
-    def crear_preferencia(self, request):
-        """
-        Crea una preferencia de pago según documentación oficial de MercadoPago
+    Esperamos recibir:
+    {
+        "pedido_id": 123,
+        "payment_id": "123456789",
+        "status": "approved",
+        "status_detail": "accredited",
+        "transaction_amount": 5000,
+        "payment_method_id": "visa",
+        "payer_email": "test@test.com",
+        "installments": 1
+    }
+    """
+    try:
+        pedido_id = request.data.get('pedido_id')
+        payment_id = request.data.get('payment_id')
+        mp_status = request.data.get('status')
         
-        POST /api/pagos/pago/crear_preferencia/
+        print(f"📥 Recibido pago de Express: pedido_id={pedido_id}, payment_id={payment_id}, status={mp_status}")
         
-        Body esperado:
-        {
-            "pedido_id": 123,
-            "items": [
-                {
-                    "title": "Ambo médico azul - Talle M",
-                    "quantity": 2,
-                    "unit_price": 15000.00
-                }
-            ],
-            "payer": {
-                "name": "Juan",
-                "surname": "Pérez", 
-                "email": "juan@email.com",
-                "phone": "3794123456"
-            }
-        }
-        
-        Response:
-        {
-            "success": true,
-            "preference_id": "123456789-abc123",
-            "init_point": "https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=...",
-            "sandbox_init_point": "https://sandbox.mercadopago.com.ar/checkout/...",
-            "pago_id": 1
-        }
-        """
-        try:
-            print("🔵 === CREAR PREFERENCIA DE PAGO ===")
-            print(f"📦 Data recibida: {request.data}")
-            
-            # 1. VALIDAR DATOS REQUERIDOS
-            pedido_id = request.data.get('pedido_id')
-            items_data = request.data.get('items', [])
-            payer_data = request.data.get('payer', {})
-            
-            if not pedido_id:
-                return Response(
-                    {'success': False, 'error': 'pedido_id es requerido'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            if not items_data:
-                return Response(
-                    {'success': False, 'error': 'items es requerido y no puede estar vacío'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            # 2. VERIFICAR QUE EL PEDIDO EXISTE
-            try:
-                pedido = Pedido.objects.get(id=pedido_id)
-                print(f"✅ Pedido encontrado: {pedido.numero_pedido}")
-            except Pedido.DoesNotExist:
-                return Response(
-                    {'success': False, 'error': 'Pedido no encontrado'},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-            
-            # 3. VERIFICAR PERMISOS (el pedido debe ser del usuario o ser admin)
-            if not request.user.is_staff and pedido.usuario != request.user:
-                return Response(
-                    {'success': False, 'error': 'No tienes permisos para este pedido'},
-                    status=status.HTTP_403_FORBIDDEN
-                )
-            
-            # 4. CONSTRUIR ITEMS PARA MERCADOPAGO
-            # Según doc oficial: cada item debe tener title, quantity, unit_price
-            preference_items = []
-            for item in items_data:
-                preference_items.append({
-                    "title": str(item.get('title', 'Producto')),
-                    "quantity": int(item.get('quantity', 1)),
-                    "unit_price": float(item.get('unit_price', 0)),
-                    "currency_id": "ARS"  # Pesos argentinos
-                })
-            
-            print(f"📦 Items para MP: {preference_items}")
-            
-            # 5. CONSTRUIR URLs DE RETORNO - ✅ CORRECCIÓN PRINCIPAL
-            # IMPORTANTE: MP requiere que success esté definida si usas auto_return
-            frontend_url = request.data.get('frontend_url', 'http://localhost:5173')
-            
-            back_urls = {
-                "success": f"{frontend_url}/compra-exitosa",
-                "failure": f"{frontend_url}/pago-fallido",    
-                "pending": f"{frontend_url}/pago-pendiente"   
-            }
-            
-            # 6. CONSTRUIR PREFERENCIA SEGÚN DOCUMENTACIÓN OFICIAL
-            preference_data = {
-                "items": preference_items,
-                "back_urls": back_urls,
-                # ⚠️ auto_return requiere URLs públicas (no localhost)
-                # "auto_return": "approved",  # Deshabilitado en desarrollo con localhost
-                "external_reference": str(pedido_id),
-                "notification_url": f"{request.scheme}://{request.get_host()}/api/pagos/pago/webhook/",
-                "statement_descriptor": "AMBOS NORTE"
-            }
-            
-            # ✅ AGREGAR INFO DEL PAGADOR CORREGIDA
-            if payer_data:
-                phone_data = {}
-                phone = payer_data.get('phone', '').strip()
-                
-                if phone:
-                    # Limpiar el teléfono de caracteres especiales
-                    phone = ''.join(filter(str.isdigit, phone))
-                    
-                    # Si empieza con 54 (código Argentina), removerlo
-                    if phone.startswith('54'):
-                        phone = phone[2:]
-                    
-                    # Formato argentino: código de área + número
-                    if len(phone) >= 8:
-                        if len(phone) == 10 and phone.startswith('11'):
-                            # Buenos Aires: 11 + 8 dígitos
-                            area_code = phone[:2]
-                            number = phone[2:]
-                        elif len(phone) == 10:
-                            # Otras provincias: 3 dígitos área + 7 dígitos
-                            area_code = phone[:3]
-                            number = phone[3:]
-                        else:
-                            # Formato básico
-                            area_code = ""
-                            number = phone
-                        
-                        phone_data = {
-                            "area_code": area_code,
-                            "number": number
-                        }
-                    else:
-                        phone_data = {
-                            "area_code": "",
-                            "number": phone
-                        }
-                
-                # Agregar información del pagador
-                preference_data["payer"] = {
-                    "name": str(payer_data.get('name', '')),
-                    "surname": str(payer_data.get('surname', '')),
-                    "email": str(payer_data.get('email', '')),
-                    "phone": phone_data
-                }
-            
-            print("📋 Preferencia a enviar:")
-            print(json.dumps(preference_data, indent=2, ensure_ascii=False))
-            
-            # 7. ✅ CREAR PREFERENCIA CON MANEJO DE ERRORES MEJORADO
-            print("🚀 Llamando a MercadoPago SDK...")
-            
-            try:
-                preference_response = sdk.preference().create(preference_data)
-                print(f"✅ Respuesta de MP: {preference_response['response']}")
-                
-                # Verificar el status code de la respuesta
-                if preference_response['status'] not in [200, 201]:
-                    error_detail = preference_response.get('response', {})
-                    error_message = error_detail.get('message', 'Error desconocido de MercadoPago')
-                    print(f"❌ Error de MP (status {preference_response['status']}): {error_message}")
-                    
-                    return Response({
-                        'success': False, 
-                        'error': f'Error de MercadoPago: {error_message}',
-                        'mp_error': error_detail
-                    }, status=status.HTTP_400_BAD_REQUEST)
-                
-                preference = preference_response['response']
-                
-                # ✅ VERIFICAR QUE LA RESPUESTA TIENE EL ID
-                if 'id' not in preference:
-                    print(f"❌ Respuesta de MP sin ID: {preference}")
-                    return Response({
-                        'success': False,
-                        'error': 'MercadoPago no devolvió un ID de preferencia válido'
-                    }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-                
-            except Exception as mp_error:
-                print(f"❌ Error en SDK de MP: {str(mp_error)}")
-                print(f"📋 Traceback: {traceback.format_exc()}")
-                return Response({
-                    'success': False,
-                    'error': f'Error de comunicación con MercadoPago: {str(mp_error)}'
-                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-            
-            # 8. CREAR REGISTRO DE PAGO EN LA BASE DE DATOS
-            try:
-                pago = Pago.objects.create(
-                    pedido=pedido,
-                    numero_pedido=pedido.numero_pedido,
-                    monto=pedido.total,
-                    metodo_pago='mercadopago',
-                    estado_pago='pendiente',
-                    preference_id=preference['id'],
-                    payer_email=payer_data.get('email'),
-                    payer_nombre=payer_data.get('name'),
-                    payer_apellido=payer_data.get('surname')
-                )
-                print(f"✅ Pago creado en BD: ID {pago.id}")
-                
-            except Exception as db_error:
-                print(f"❌ Error creando pago en BD: {str(db_error)}")
-                # No fallar aquí, la preferencia ya se creó
-                pago = None
-            
-            # 9. ✅ RESPUESTA EXITOSA
-            response_data = {
-                'success': True,
-                'data': {
-                    'preference_id': preference['id'],
-                    'init_point': preference.get('init_point'),
-                    'sandbox_init_point': preference.get('sandbox_init_point'),
-                }
-            }
-            
-            if pago:
-                response_data['data'].update({
-                    'pago_id': pago.id,
-                    'pedido_id': pedido.id,
-                    'monto': float(pedido.total)
-                })
-            
-            print(f"🎉 Preferencia creada exitosamente: {response_data}")
-            return Response(response_data, status=status.HTTP_201_CREATED)
-            
-        except Exception as e:
-            print(f"❌ Error en crear_preferencia: {str(e)}")
-            print(f"📋 Traceback completo:")
-            print(traceback.format_exc())
+        # Validar datos requeridos
+        if not all([pedido_id, payment_id, mp_status]):
             return Response({
                 'success': False,
-                'error': str(e),
-                'detail': 'Error interno del servidor'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
-    @method_decorator(csrf_exempt, name='dispatch')
-    @action(detail=False, methods=['post'], permission_classes=[AllowAny])
-    def webhook(self, request):
-        """
-        Webhook para recibir notificaciones de MercadoPago
+                'error': 'Faltan datos requeridos (pedido_id, payment_id, status)'
+            }, status=status.HTTP_400_BAD_REQUEST)
         
-        POST /api/pagos/pago/webhook/
+        # Buscar el pedido
+        try:
+            pedido = Pedido.objects.get(id=pedido_id)
+            print(f"✅ Pedido encontrado: {pedido.numero_pedido}")
+        except Pedido.DoesNotExist:
+            print(f"❌ Pedido {pedido_id} no encontrado")
+            return Response({
+                'success': False,
+                'error': f'Pedido con ID {pedido_id} no encontrado'
+            }, status=status.HTTP_404_NOT_FOUND)
         
-        MercadoPago enviará notificaciones automáticas cuando:
-        - Se crea un pago
-        - Se actualiza el estado de un pago
-        - Se procesa una devolución
-        - etc.
+        # Mapear estados de MercadoPago a nuestros estados
+        estado_mapping = {
+            'approved': 'aprobado',
+            'pending': 'pendiente',
+            'in_process': 'en_proceso',
+            'rejected': 'rechazado',
+            'cancelled': 'cancelado',
+            'refunded': 'devuelto'
+        }
         
+        estado_pago = estado_mapping.get(mp_status, 'pendiente')
+        
+        # Crear o actualizar el pago
+        pago, created = Pago.objects.update_or_create(
+            payment_id=payment_id,
+            defaults={
+                'pedido': pedido,
+                'numero_pedido': pedido.numero_pedido,
+                'monto': request.data.get('transaction_amount', pedido.total),
+                'metodo_pago': 'mercadopago',
+                'estado_pago': estado_pago,
+                'status_detail': request.data.get('status_detail'),
+                'payer_email': request.data.get('payer_email'),
+                'tipo_pago': request.data.get('payment_method_id'),
+                'cuotas': request.data.get('installments', 1),
+                'fecha_pago': timezone.now() if mp_status == 'approved' else None
+            }
+        )
+        
+        action_text = "creado" if created else "actualizado"
+        print(f"✅ Pago {action_text}: ID={pago.id}, Estado={estado_pago}")
+        
+        # Si el pago fue aprobado, actualizar estado del pedido
+        if estado_pago == 'aprobado':
+            estado_anterior = pedido.estado
+            pedido.estado = 'en_preparacion'
+            pedido.save()
+            
+            print(f"✅ Pedido actualizado: {estado_anterior} → en_preparacion")
+            
+            # Registrar en historial
+            HistorialEstadoPedido.objects.create(
+                pedido=pedido,
+                estado_anterior=estado_anterior,
+                estado_nuevo='en_preparacion',
+                usuario_modificador=None,  # Sistema automático
+                comentario=f'Pago aprobado automáticamente - Payment ID: {payment_id}'
+            )
+        
+        return Response({
+            'success': True,
+            'pago_id': pago.id,
+            'created': created,
+            'estado': estado_pago,
+            'pedido_actualizado': pedido.estado if estado_pago == 'aprobado' else None
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        print(f"❌ Error en confirmar_pago_mp: {str(e)}")
+        import traceback
+        print(f"📋 Traceback:\n{traceback.format_exc()}")
+        return Response({
+            'success': False,
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+def verificar_pago(request, payment_id):
+    """
+    Verificar el estado de un pago por payment_id
+    GET /api/pagos/verificar/{payment_id}/
+    """
+    try:
+        pago = Pago.objects.get(payment_id=payment_id)
+        serializer = PagoSerializer(pago)
+        return Response({
+            'success': True,
+            'pago': serializer.data
+        })
+    except Pago.DoesNotExist:
+        return Response({
+            'success': False,
+            'error': 'Pago no encontrado'
+        }, status=status.HTTP_404_NOT_FOUND)
         Documentación: https://www.mercadopago.com.ar/developers/es/docs/your-integrations/notifications/webhooks
         """
         try:
