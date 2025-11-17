@@ -285,7 +285,7 @@ export default function Catalogo() {
       <aside className="w-full md:w-96 bg-white border-gray-200">
         <CategoryFilter defaultFilters={filters} onFiltersChange={handleFiltersChange} />
       </aside>
-      <main className="flex-1 p-6 md:mt-24">
+      <main className="flex-1 p-8 md:pt-32">
         {loading && <p className="text-gray-600">Cargando productos...</p>}
         {error && <p className="text-red-600">{error}</p>}
         {!loading && !error && (

@@ -1,6 +1,6 @@
 export default function Contacto() {
   return (
-    <section className="bg-[#F0F6F6] px-6 md:px-20 py-16 flex items-center">
+    <section className="bg-[#F0F6F6] h-screen px-6 md:px-20 py-16 flex items-center">
       <div className="max-w-6xl mx-auto w-full space-y-10">
         <div className="grid grid-cols-1 md:grid-cols-2 md:gap-10 items-start">
           <div className="space-y-6 mt-12 md:mt-24">

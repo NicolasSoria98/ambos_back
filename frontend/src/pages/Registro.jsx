@@ -91,7 +91,7 @@ export default function Registro() {
   };
 
   return (
-    <div className="h-screen md:h-[calc(100vh-6rem)] flex flex-col md:flex-row z-0">
+    <div className="h-screen flex flex-col md:flex-row z-0">
       <div className="md:w-1/2 flex flex-col justify-center items-center bg-[#084B83] text-white text-center py-12 mt-16">
         <div>
           <h1 className="text-2xl md:text-3xl">Bienvenido/a a</h1>

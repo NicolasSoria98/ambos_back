@@ -392,7 +392,7 @@ export default function Producto() {
   };
 
   return (
-    <section className="min-h-screen bg-[#F0F6F6] px-6 md:px-20 py-12 mt-12 md:mt-24">
+    <section className="min-h-screen bg-[#F0F6F6] px-6 md:px-20 p-36">
       <div className="flex flex-col md:flex-row gap-10 items-start mb-16">
         <div className="flex-1 flex flex-col items-center gap-4 w-full">
           <div className="w-full max-w-md">
@@ -433,9 +433,8 @@ export default function Producto() {
                     key={url + index}
                     type="button"
                     onClick={() => setImagenActiva(index)}
-                    className={`w-20 h-20 rounded-xl overflow-hidden border-2 transition ${
-                      isActive ? "border-[#084B83]" : "border-transparent"
-                    }`}
+                    className={`w-20 h-20 rounded-xl overflow-hidden border-2 transition ${isActive ? "border-[#084B83]" : "border-transparent"
+                      }`}
                     aria-label={`Ver imagen ${index + 1}`}
                   >
                     <img src={url} alt="" className="w-full h-full object-cover" />
@@ -460,9 +459,8 @@ export default function Producto() {
                       key={color.id}
                       type="button"
                       onClick={() => handleColorSelect(color.id)}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-full border text-sm font-medium transition ${
-                        isActive ? "border-[#084B83] text-[#084B83] shadow-sm" : "border-gray-300 text-gray-700"
-                      }`}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-full border text-sm font-medium transition ${isActive ? "border-[#084B83] text-[#084B83] shadow-sm" : "border-gray-300 text-gray-700"
+                        }`}
                     >
                       <span
                         className="w-5 h-5 rounded-full border border-gray-300"
@@ -503,7 +501,7 @@ export default function Producto() {
               </div>
             </div>
           ) : null}
-          
+
           {stockLabel && (
             <p className="text-sm text-gray-600">
               {stockLabel}
@@ -573,7 +571,7 @@ export default function Producto() {
           <p className="text-gray-600 leading-relaxed">{producto.descripcion}</p>
         </div>
       )}
-      <div className="mb-16">
+      <div>
         <h2 className="text-xl font-semibold mb-6">Otros productos</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {otros.map((p) => (
