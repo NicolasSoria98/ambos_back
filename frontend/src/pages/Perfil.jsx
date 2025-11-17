@@ -4,17 +4,13 @@ import { User, Lock, Package } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import authService from "../services/auth";
 
-// ✅ FIX: Función que obtiene el token correcto según el contexto
 const getAuthToken = () => {
-  // Intentar obtener token de cliente primero
   const clientToken = authService.getClienteToken();
   if (clientToken) return clientToken;
-  
-  // Si no hay token de cliente, intentar con admin
+
   const adminToken = authService.getAdminToken();
   if (adminToken) return adminToken;
-  
-  // Fallback: buscar en localStorage con nombres alternativos
+
   return (
     localStorage.getItem("client_authToken") ||
     localStorage.getItem("admin_authToken") ||
@@ -72,7 +68,7 @@ export default function Perfil() {
   useEffect(() => {
     const cargarPedidos = async () => {
       try {
-        const token = getAuthToken(); // ✅ FIX: Usar getAuthToken
+        const token = getAuthToken();
         if (!token) throw new Error("Sin token");
         const response = await fetch(`${import.meta.env.VITE_API_URL}/pedidos/pedido/`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -118,7 +114,7 @@ export default function Perfil() {
     e.preventDefault();
 
     try {
-      const token = getAuthToken(); // ✅ FIX: Usar getAuthToken
+      const token = getAuthToken();
       if (!token) {
         alert("Tu sesión expiró. Iniciá nuevamente.");
         logout();
@@ -177,7 +173,7 @@ export default function Perfil() {
     }
 
     try {
-      const token = getAuthToken(); // ✅ FIX: Usar getAuthToken
+      const token = getAuthToken();
       if (!token) {
         alert("Tu sesión expiró. Iniciá nuevamente.");
         logout();
@@ -229,7 +225,7 @@ export default function Perfil() {
   }
 
   return (
-    <div className="h-full min-h-[calc(100vh-6rem)] md:min-h-[calc(100vh-8rem)] bg-[#F0F6F6] flex flex-col md:flex-row py-10 px-8 md:px-16 md:items-center md:justify-center">
+    <div className="min-h-screen bg-[#F0F6F6] flex flex-col md:flex-row py-10 px-8 md:px-16 md:items-center md:justify-center">
       <aside className="md:w-1/6 w-full md:mr-12 mb-8 md:mb-0">
         <div className="bg-white rounded-2xl shadow-lg p-0 flex flex-col">
           <button

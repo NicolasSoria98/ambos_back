@@ -87,8 +87,8 @@ export default function CategoryFilter({ defaultFilters, onFiltersChange }) {
         const sexosList = Array.isArray(sexosData?.sexos)
           ? sexosData.sexos
           : Array.isArray(sexosData)
-          ? sexosData
-          : [];
+            ? sexosData
+            : [];
         setSexosDisponibles(sexosList);
         setFiltersError("");
       } catch (error) {
@@ -183,12 +183,12 @@ export default function CategoryFilter({ defaultFilters, onFiltersChange }) {
   };
 
   return (
-    <div className="h-full bg-white">
-      <div className="p-8 mt-20">
-        <h2 className="text-3xl font-bold text-[#084B83] mb-8 tracking-tight">
-          PRODUCTOS
+    <div className="h-full bg-[#F0F6F6]">
+      <div className="px-8 md:px-24 pt-20 md:pt-32">
+        <h2 className="text-4xl font-bold text-[#084B83] mb-4 md:mb-8 leading-tight">
+          CATÁLOGO
         </h2>
-        <div className="space-y-4">
+        <div>
           <section className="pb-6 border-b border-gray-100">
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">
               Ordenar por
@@ -312,13 +312,12 @@ export default function CategoryFilter({ defaultFilters, onFiltersChange }) {
                       key={color.id}
                       type="button"
                       onClick={() => toggleColor(value)}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-semibold transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${
-                        hexColor
+                      className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-semibold transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${hexColor
                           ? "bg-transparent"
                           : isSelected
-                          ? "border-[#2F4858] bg-[#F0F6F6] text-[#2F4858]"
-                          : "border-gray-200 bg-white text-gray-700 hover:border-gray-300"
-                      }`}
+                            ? "border-[#2F4858] bg-[#F0F6F6] text-[#2F4858]"
+                            : "border-gray-200 bg-white text-gray-700 hover:border-gray-300"
+                        }`}
                       style={hexColor ? buttonStyle : undefined}
                     >
                       {color.nombre}
@@ -370,7 +369,6 @@ export default function CategoryFilter({ defaultFilters, onFiltersChange }) {
               </div>
             )}
           </section>
-
           {filtersError && (
             <div className="p-3 bg-red-50 border border-red-100 rounded-lg">
               <p className="text-sm text-red-600">{filtersError}</p>
