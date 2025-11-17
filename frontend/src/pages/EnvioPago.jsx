@@ -1,6 +1,6 @@
 import { initMercadoPago } from '@mercadopago/sdk-react';
 import PaymentBrick from '../components/PaymentBrick';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import authService from '../services/auth';
 
@@ -47,11 +47,26 @@ export default function EnvioPago() {
   const [pedidoData, setPedidoData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [tipoEntrega, setTipoEntrega] = useState('envio'); // 'envio' o 'retiro'
+  const [tipoEntrega, setTipoEntrega] = useState('envio');
+  const [actualizandoEntrega, setActualizandoEntrega] = useState(false);
+  
+  // ✅ Ref para evitar crear el pedido múltiples veces
+  const pedidoCreado = useRef(false);
 
+  // ✅ Crear pedido solo UNA vez al montar el componente
   useEffect(() => {
-    crearPedido();
-  }, [tipoEntrega]); // ✅ Recrear pedido cuando cambia tipo de entrega
+    if (!pedidoCreado.current) {
+      pedidoCreado.current = true;
+      crearPedido();
+    }
+  }, []); // Sin dependencias, solo se ejecuta al montar
+
+  // ✅ Actualizar pedido cuando cambia el tipo de entrega
+  useEffect(() => {
+    if (pedidoData && !actualizandoEntrega) {
+      actualizarTipoEntrega();
+    }
+  }, [tipoEntrega]); // Solo cuando cambia tipoEntrega
 
   const crearPedido = async () => {
     try {
@@ -83,14 +98,13 @@ export default function EnvioPago() {
         precio_unitario: item.precio
       }));
 
-      // ✅ Calcular subtotal (sin envío)
+      // ✅ Calcular subtotal y total
       const subtotal = cart.reduce((sum, it) => {
         const precio = Number(it.precio) || 0;
         const cantidad = Number(it.cantidad) || 1;
         return sum + (precio * cantidad);
       }, 0);
 
-      // ✅ Agregar costo de envío solo si es envío a domicilio
       const costoEnvio = tipoEntrega === 'envio' ? COSTO_ENVIO : 0;
       const total = subtotal + costoEnvio;
 
@@ -109,13 +123,12 @@ export default function EnvioPago() {
       };
 
       console.log('📤 Creando pedido:', pedidoPayload);
-      console.log('🔑 Token usado:', token ? 'Token presente' : 'Sin token');
 
       const response = await fetch(`${import.meta.env.VITE_API_URL}/pedidos/pedido/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` // ✅ Siempre enviar el token
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(pedidoPayload)
       });
@@ -140,6 +153,67 @@ export default function EnvioPago() {
     }
   };
 
+  // ✅ Nueva función para actualizar el tipo de entrega del pedido existente
+  const actualizarTipoEntrega = async () => {
+    if (!pedidoData?.id) return;
+
+    try {
+      setActualizandoEntrega(true);
+      
+      const token = getAuthToken();
+      const user = getAuthUser();
+      
+      // Recalcular total según el nuevo tipo de entrega
+      const subtotal = pedidoData.items.reduce((sum, item) => {
+        return sum + (Number(item.subtotal) || 0);
+      }, 0);
+
+      const costoEnvio = tipoEntrega === 'envio' ? COSTO_ENVIO : 0;
+      const total = subtotal + costoEnvio;
+
+      const updatePayload = {
+        total: total,
+        envio: {
+          tipo: tipoEntrega,
+          costo: costoEnvio
+        },
+        notas: tipoEntrega === 'retiro' ? 'Retiro en local' : '',
+        contacto: {
+          email: user.email || pedidoData.email_contacto || 'cliente@example.com',
+          telefono: user.telefono || pedidoData.telefono_contacto || '3794000000'
+        }
+      };
+
+      console.log('🔄 Actualizando pedido:', pedidoData.id, updatePayload);
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/pedidos/pedido/${pedidoData.id}/`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(updatePayload)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Error al actualizar pedido');
+      }
+
+      const pedidoActualizado = await response.json();
+      console.log('✅ Pedido actualizado:', pedidoActualizado);
+
+      setPedidoData(pedidoActualizado);
+      localStorage.setItem('last_order', JSON.stringify(pedidoActualizado));
+
+    } catch (error) {
+      console.error('❌ Error actualizando pedido:', error);
+      // No mostramos error al usuario, solo log en consola
+    } finally {
+      setActualizandoEntrega(false);
+    }
+  };
+
   const handlePaymentSuccess = async (result) => {
     console.log('✅ Pago exitoso:', result);
     
@@ -160,11 +234,9 @@ export default function EnvioPago() {
     navigate(`/pago-fallido?external_reference=${pedidoData?.id}`);
   };
 
-  // ✅ Handler para pago en el local
   const handlePagoEnLocal = () => {
     if (!pedidoData) return;
     
-    // Guardar que eligió pago en local
     localStorage.setItem('ultimo_pago', JSON.stringify({
       payment_id: `LOCAL-${pedidoData.id}`,
       status: 'pending',
@@ -173,7 +245,6 @@ export default function EnvioPago() {
     
     localStorage.removeItem('cart');
     
-    // Redirigir a página de pendiente con mensaje especial
     navigate(`/pago-pendiente?payment_id=LOCAL-${pedidoData.id}&external_reference=${pedidoData.id}&type=local`);
   };
 
@@ -207,7 +278,7 @@ export default function EnvioPago() {
 
   if (!pedidoData) return null;
 
-  const subtotal = pedidoData.total - (tipoEntrega === 'envio' ? COSTO_ENVIO : 0);
+  const subtotal = pedidoData.items?.reduce((sum, item) => sum + Number(item.subtotal || 0), 0) || 0;
 
   return (
     <section className="min-h-screen bg-[#F0F6F6] px-6 md:px-20 py-10">
@@ -235,6 +306,7 @@ export default function EnvioPago() {
                     value="envio"
                     checked={tipoEntrega === 'envio'}
                     onChange={(e) => setTipoEntrega(e.target.value)}
+                    disabled={actualizandoEntrega}
                     className="mr-3"
                   />
                   <div>
@@ -250,6 +322,7 @@ export default function EnvioPago() {
                     value="retiro"
                     checked={tipoEntrega === 'retiro'}
                     onChange={(e) => setTipoEntrega(e.target.value)}
+                    disabled={actualizandoEntrega}
                     className="mr-3"
                   />
                   <div>
@@ -258,6 +331,9 @@ export default function EnvioPago() {
                   </div>
                 </label>
               </div>
+              {actualizandoEntrega && (
+                <p className="text-xs text-blue-600 mt-2">Actualizando...</p>
+              )}
             </div>
             
             <div className="border-t pt-4">
