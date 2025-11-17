@@ -25,6 +25,7 @@ class PedidoViewSet(viewsets.ModelViewSet):
             'direccion'
         ).prefetch_related(
             'items__producto',
+            'items__variante',
             'historial'
         )
         
@@ -67,10 +68,10 @@ class PedidoViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         """
         Permisos por acción:
-        - list/retrieve/create: usuario autenticado
+        - list/retrieve/create/actualizar_pago: usuario autenticado
         - resto (update/partial_update/destroy y acciones admin): admin
         """
-        if self.action in ['list', 'retrieve', 'create']:
+        if self.action in ['list', 'retrieve', 'create', 'actualizar_pago']:
             return [IsAuthenticated()]
         return [IsAuthenticated(), IsAdminUser()]
 
@@ -87,7 +88,85 @@ class PedidoViewSet(viewsets.ModelViewSet):
             output = PedidoSerializer(pedido, context={'request': request}).data
             return Response(output, status=status.HTTP_201_CREATED)
         except Exception as e:
+            print(f"❌ Error creando pedido: {str(e)}")
+            print(f"📋 Traceback: {traceback.format_exc()}")
             return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=True, methods=['post'])
+    def actualizar_pago(self, request, pk=None):
+        """
+        Actualiza el estado_pago del pedido
+        POST /api/pedidos/pedido/{id}/actualizar_pago/
+        Body: { "estado_pago": "pagado", "payment_id": "123456" }
+        """
+        try:
+            print(f"📥 Solicitud para actualizar pago del pedido {pk}")
+            print(f"📋 Datos recibidos: {request.data}")
+            
+            pedido = self.get_object()
+            estado_pago = request.data.get('estado_pago')
+            payment_id = request.data.get('payment_id')
+            
+            if not estado_pago:
+                return Response(
+                    {'error': 'estado_pago es requerido'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            print(f"🔍 Pedido encontrado: {pedido.numero_pedido}")
+            print(f"   Estado actual: {pedido.estado}")
+            print(f"   Estado pago actual: {pedido.estado_pago}")
+            print(f"   Método pago: {pedido.metodo_pago}")
+            
+            # Actualizar el estado_pago del pedido
+            pedido.estado_pago = estado_pago
+            pedido.save()
+            
+            print(f"✅ Pedido actualizado:")
+            print(f"   Estado: {pedido.estado} (sin cambios)")
+            print(f"   Estado pago: {pedido.estado_pago} (actualizado)")
+            
+            # 🔥 CAMBIO CRÍTICO: Buscar y actualizar el pago existente
+            from apps.pagos.models import Pago
+            try:
+                pago = Pago.objects.get(pedido=pedido)
+                print(f"✅ Pago existente encontrado: ID={pago.id}")
+                
+                # Actualizar el pago existente
+                pago.estado_pago = 'aprobado' if estado_pago == 'pagado' else estado_pago
+                
+                # Si se proporciona payment_id, actualizarlo
+                if payment_id:
+                    pago.payment_id = payment_id
+                
+                # Si fue pagado, registrar la fecha de pago
+                if estado_pago == 'pagado':
+                    from django.utils import timezone
+                    pago.fecha_pago = timezone.now()
+                    print(f"📅 Fecha de pago registrada: {pago.fecha_pago}")
+                
+                pago.save()
+                print(f"✅ Pago actualizado: ID={pago.id}, estado={pago.estado_pago}")
+                
+            except Pago.DoesNotExist:
+                print(f"⚠️ No se encontró pago para el pedido {pedido.numero_pedido}")
+                # Opcionalmente, podrías crear uno aquí si no existe
+            
+            return Response({
+                'mensaje': 'Pago actualizado correctamente',
+                'success': True,
+                'pedido_id': pedido.id,
+                'estado_pago': pedido.estado_pago,
+                'estado_pedido': pedido.estado
+            })
+            
+        except Exception as e:
+            print(f"❌ Error en actualizar_pago: {str(e)}")
+            print(f"📋 Traceback: {traceback.format_exc()}")
+            return Response(
+                {'error': str(e), 'success': False},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
     
     @action(detail=True, methods=['post'])
     def cambiar_estado(self, request, pk=None):
@@ -270,10 +349,9 @@ class PedidoViewSet(viewsets.ModelViewSet):
                     activo=True
                 ).count()
             
-            # Total vendido (solo pedidos activos y completados)
-            # CAMBIO: Removido 'pagado' de la lista de estados
+            # Total vendido (solo pedidos activos y con pago confirmado)
             total_vendido = Pedido.objects.filter(
-                estado__in=['en_preparacion', 'enviado', 'entregado'],
+                estado_pago='pagado',
                 activo=True
             ).aggregate(total=Sum('total'))['total'] or 0
             
@@ -322,7 +400,7 @@ class ItemPedidoSetView(viewsets.ModelViewSet):
         """
         Filtra items por pedido si se proporciona el parámetro
         """
-        queryset = ItemPedido.objects.select_related('pedido', 'producto')
+        queryset = ItemPedido.objects.select_related('pedido', 'producto', 'variante')
         pedido_id = self.request.query_params.get('pedido', None)
         
         if pedido_id:

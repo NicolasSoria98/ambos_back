@@ -185,22 +185,10 @@ export default function PagoPendiente() {
           </div>
         )}
 
-        {!esPagoEfectivo && !esPagoTransferencia && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-6 text-left">
-            <h3 className="font-bold text-yellow-900 mb-2">
-              ⏳ Tu pago está siendo procesado
-            </h3>
-            <p className="text-sm text-yellow-700">
-              Estamos esperando la confirmación del pago. Te notificaremos por email cuando esté aprobado.
-            </p>
-          </div>
-        )}
-
         {/* Advertencia de vencimiento */}
         <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-6">
           <p className="text-sm text-orange-800">
-            <strong>⚠️ Importante:</strong> El comprobante tiene una fecha de vencimiento. 
-            Si no completás el pago antes de esa fecha, el pedido será cancelado automáticamente.
+            <strong>⚠️ Importante:</strong> Debes pasar por alguna sucursal a retirar tu pedido y efectuar el pago, recuerda que tienes tu reserva por 48hs. En caso que no retires tu pedido, perderás la reserva del producto
           </p>
         </div>
 
