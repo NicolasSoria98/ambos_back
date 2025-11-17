@@ -13,9 +13,10 @@ export default function PaymentBrick({
 
   const initialization = {
     amount: amount,
-    // 🔥 AGREGAR ESTO - Configuración del pagador
     payer: {
-      email: ''
+      email: '',
+      // ✅ AGREGADO: entityType requerido
+      entityType: 'individual'
     }
   };
 
@@ -25,14 +26,13 @@ export default function PaymentBrick({
         theme: 'default'
       }
     },
-    // 🔥 ESTO ES LO IMPORTANTE - Especificar métodos de pago
+    // ✅ CORREGIDO: Solo métodos permitidos
     paymentMethods: {
       creditCard: 'all',
       debitCard: 'all',
-      ticket: 'all',
-      bankTransfer: 'all',
-      atm: 'all',
+      ticket: 'all',           // Efectivo (Pago Fácil, Rapipago)
       mercadoPago: 'all'
+      // ❌ Removidos: atm y bankTransfer (no están habilitados en tu cuenta)
     }
   };
 
@@ -55,6 +55,9 @@ export default function PaymentBrick({
       const result = await mercadopagoService.procesarPago(paymentData);
 
       if (result.success && result.status === 'approved') {
+        onPaymentSuccess(result);
+      } else if (result.success && (result.status === 'pending' || result.status === 'in_process')) {
+        // ✅ Pagos pendientes (efectivo) también son exitosos
         onPaymentSuccess(result);
       } else {
         onPaymentError(result);
