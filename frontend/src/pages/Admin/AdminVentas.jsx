@@ -755,31 +755,31 @@ export default function AdminVentas() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200" style={{ minWidth: '600px' }}>
+            <table className="w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     ID
                   </th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Fecha
                   </th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Cliente
                   </th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Pedido
                   </th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Monto
                   </th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Estado
                   </th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden sm:table-cell">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
                     Método
                   </th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Acc.
                   </th>
                 </tr>
@@ -788,40 +788,40 @@ export default function AdminVentas() {
                 {pagosFiltrados.length > 0 ? (
                   pagosFiltrados.map((pago) => (
                     <tr key={pago.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-2 py-2 whitespace-nowrap text-xs font-medium text-gray-900">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                         #{pago.id}
                       </td>
-                      <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-700">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
                         {new Date(pago.fecha_pago || pago.fecha_creacion).toLocaleDateString('es-AR', {
                           day: '2-digit',
                           month: '2-digit'
                         })}
                       </td>
-                      <td className="px-2 py-2 text-xs text-gray-700">
-                        <div className="max-w-[120px]">
-                          <div className="font-medium truncate">
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <div>
+                          <div className="font-medium">
                             {pago.cliente_nombre || 'Sin nombre'}
                           </div>
-                          <div className="text-xs text-gray-500 truncate">
+                          <div className="text-xs text-gray-500">
                             {pago.cliente_email || 'Sin email'}
                           </div>
                         </div>
                       </td>
-                      <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-700">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
                         #{typeof pago.pedido === 'number' ? pago.pedido : pago.pedido?.id || 'N/A'}
                       </td>
-                      <td className="px-2 py-2 whitespace-nowrap text-xs font-semibold text-gray-900">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-900">
                         ${parseFloat(pago.monto || 0).toLocaleString()}
                       </td>
-                      <td className="px-2 py-2 whitespace-nowrap">
-                        <span className={`px-1.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${getEstadoBadge(pago.estado_pago)}`}>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className={`px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getEstadoBadge(pago.estado_pago)}`}>
                           {getEstadoTexto(pago.estado_pago)}
                         </span>
                       </td>
-                      <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-700 hidden sm:table-cell">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 hidden sm:table-cell">
                         {pago.metodo_pago || 'MP'}
                       </td>
-                      <td className="px-2 py-2 whitespace-nowrap text-xs">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm">
                         <button
                           onClick={() => abrirModalEdicion(pago)}
                           className="text-indigo-600 hover:text-indigo-900 font-medium"

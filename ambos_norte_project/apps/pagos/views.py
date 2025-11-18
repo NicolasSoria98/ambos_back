@@ -31,7 +31,74 @@ class PagoViewSet(viewsets.ModelViewSet):
             
         return queryset
 
+    @action(detail=True, methods=['patch'], url_path='cambiar_estado')
+    def cambiar_estado(self, request, pk=None):
+        """
+        Endpoint para cambiar el estado de un pago (solo admin)
+        PATCH /api/pagos/pago/{id}/cambiar_estado/
+        Body: { "estado": "aprobado" | "pendiente" | "cancelado" }
+        """
+        try:
+            pago = self.get_object()
+            nuevo_estado = request.data.get('estado')
 
+            # Validar que el estado sea válido
+            estados_validos = ['aprobado', 'pendiente', 'cancelado']
+            if nuevo_estado not in estados_validos:
+                return Response({
+                    'success': False,
+                    'error': f'Estado inválido. Debe ser uno de: {", ".join(estados_validos)}'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Guardar estado anterior para el log
+            estado_anterior = pago.estado_pago
+
+            # Actualizar el estado
+            pago.estado_pago = nuevo_estado
+
+            # Si se aprueba manualmente, registrar fecha de pago
+            if nuevo_estado == 'aprobado' and not pago.fecha_pago:
+                pago.fecha_pago = timezone.now()
+
+            pago.save()
+
+            print(f"✅ Estado de pago {pago.id} cambiado de '{estado_anterior}' a '{nuevo_estado}'")
+
+            # Si hay un pedido asociado, actualizar su estado_pago también
+            if pago.pedido:
+                pedido = pago.pedido
+                if nuevo_estado == 'aprobado':
+                    estado_anterior_pedido = pedido.estado
+                    pedido.estado_pago = 'pagado'
+                    pedido.save()
+
+                    # Registrar en historial
+                    HistorialEstadoPedido.objects.create(
+                        pedido=pedido,
+                        estado_anterior=estado_anterior_pedido,
+                        estado_nuevo=pedido.estado,
+                        usuario_modificador=request.user if request.user.is_authenticated else None,
+                        comentario=f'Pago aprobado manualmente por administrador - Pago ID: {pago.id}'
+                    )
+                    print(f"✅ Pedido {pedido.numero_pedido} actualizado a estado_pago: pagado")
+                elif nuevo_estado == 'cancelado':
+                    pedido.estado_pago = 'pendiente'
+                    pedido.save()
+                    print(f"✅ Pedido {pedido.numero_pedido} actualizado a estado_pago: pendiente")
+
+            serializer = self.get_serializer(pago)
+            return Response({
+                'success': True,
+                'data': serializer.data,
+                'mensaje': f'Estado actualizado de "{estado_anterior}" a "{nuevo_estado}"'
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            print(f"❌ Error cambiando estado de pago: {str(e)}")
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 @api_view(['POST'])
 def confirmar_pago_mp(request):
     """
