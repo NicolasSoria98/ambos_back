@@ -17,15 +17,14 @@ export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
 
-  // ✅ FIX: Calcular isAdminArea dinámicamente desde currentPath
+  // Calcular isAdminArea dinámicamente desde currentPath
   const isAdminArea = currentPath.startsWith('/admin');
 
   // Calcular isAdmin basado en el user actual
   const isAdmin = user?.tipo_usuario === 'administrador' || user?.is_staff === true;
 
-  // ✅ FIX: Listener para detectar cambios de ruta
+  // Listener para detectar cambios de ruta
   useEffect(() => {
-    // Función que actualiza el path actual
     const handleLocationChange = () => {
       const newPath = window.location.pathname;
       if (newPath !== currentPath) {
@@ -33,10 +32,8 @@ export const AuthProvider = ({ children }) => {
       }
     };
 
-    // Escuchar navegación del navegador (botones adelante/atrás)
     window.addEventListener('popstate', handleLocationChange);
     
-    // Escuchar cambios de ruta (para React Router)
     const originalPushState = window.history.pushState;
     const originalReplaceState = window.history.replaceState;
 
@@ -50,7 +47,6 @@ export const AuthProvider = ({ children }) => {
       handleLocationChange();
     };
 
-    // Cleanup
     return () => {
       window.removeEventListener('popstate', handleLocationChange);
       window.history.pushState = originalPushState;
@@ -58,7 +54,7 @@ export const AuthProvider = ({ children }) => {
     };
   }, [currentPath]);
 
-  // ✅ FIX: Recargar autenticación cuando cambia currentPath
+  // Recargar autenticación cuando cambia currentPath
   useEffect(() => {
     checkAuth();
   }, [currentPath]);
@@ -67,15 +63,7 @@ export const AuthProvider = ({ children }) => {
     const adminArea = currentPath.startsWith('/admin');
     
     if (adminArea) {
-      // ✅ FIX: Limpiar tokens de cliente al entrar en área admin
-      const hasClientToken = localStorage.getItem('client_authToken');
-      if (hasClientToken) {
-        localStorage.removeItem('client_authToken');
-        localStorage.removeItem('client_refreshToken');
-        localStorage.removeItem('client_user');
-      }
-      
-      // Área de admin - cargar sesión de admin
+      // ✅ FIX: NO limpiar tokens de cliente, solo cargar sesión de admin
       const authenticated = authService.isAdminAuthenticated();
       const currentUser = authService.getAdminUser();
       
@@ -96,15 +84,7 @@ export const AuthProvider = ({ children }) => {
         }
       }
     } else {
-      // ✅ FIX: Limpiar tokens de admin al entrar en área cliente
-      const hasAdminToken = localStorage.getItem('admin_authToken');
-      if (hasAdminToken) {
-        localStorage.removeItem('admin_authToken');
-        localStorage.removeItem('admin_refreshToken');
-        localStorage.removeItem('admin_user');
-      }
-      
-      // Área de cliente - cargar sesión de cliente
+      // ✅ FIX: NO limpiar tokens de admin, solo cargar sesión de cliente
       const authenticated = authService.isClienteAuthenticated();
       const currentUser = authService.getClienteUser();
       

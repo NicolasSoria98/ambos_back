@@ -39,7 +39,7 @@ api.interceptors.request.use(
       // Área de admin - SOLO usar token de admin
       token = adminToken;
     } else {
-      // Área de cliente - SOLO usar token de cliente (SIN fallback)
+      // Área de cliente - SOLO usar token de cliente (SIN fallback a admin)
       token = clientToken;
     }
     
@@ -60,7 +60,7 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
     
-    // ✅ FIX: Manejar token expirado (401) con refresh automático
+    // Manejar token expirado (401) con refresh automático
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
       

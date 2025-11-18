@@ -9,35 +9,16 @@ initMercadoPago('TEST-4aa13959-24eb-4a20-8858-fbc57f97deb1');
 
 const COSTO_ENVIO = 2000;
 
+// ✅ FIX CRÍTICO: Solo obtener token de CLIENTE (sin fallback a admin)
 const getAuthToken = () => {
   const clientToken = authService.getClienteToken();
-  if (clientToken) return clientToken;
-
-  const adminToken = authService.getAdminToken();
-  if (adminToken) return adminToken;
-
-  return (
-    localStorage.getItem("client_authToken") ||
-    localStorage.getItem("admin_authToken") ||
-    localStorage.getItem("clientAuthToken") ||
-    localStorage.getItem("authToken") ||
-    null
-  );
+  return clientToken || null;
 };
 
+// ✅ FIX CRÍTICO: Solo obtener usuario de CLIENTE (sin fallback a admin)
 const getAuthUser = () => {
   const clientUser = authService.getClienteUser();
-  if (clientUser) return clientUser;
-
-  const adminUser = authService.getAdminUser();
-  if (adminUser) return adminUser;
-
-  try {
-    const userStr = localStorage.getItem('client_user') || localStorage.getItem('admin_user') || localStorage.getItem('user');
-    return userStr ? JSON.parse(userStr) : {};
-  } catch {
-    return {};
-  }
+  return clientUser || null;
 };
 
 export default function EnvioPago() {
@@ -72,7 +53,7 @@ export default function EnvioPago() {
 
     const token = getAuthToken();
     if (!token) {
-      alert('Debes iniciar sesión para realizar una compra');
+      alert('Debes iniciar sesión como cliente para realizar una compra');
       navigate('/registro');
       return;
     }
@@ -80,7 +61,7 @@ export default function EnvioPago() {
     setCart(cartData);
   }, [navigate]);
 
-  // ✅ Cargar dirección cuando cambia a envío
+  // Cargar dirección cuando cambia a envío
   useEffect(() => {
     if (tipoEntrega === 'envio' && !direccionCargada) {
       cargarDireccionUsuario();
@@ -92,7 +73,7 @@ export default function EnvioPago() {
       setLoadingDireccion(true);
       const user = getAuthUser();
 
-      if (!user.id) {
+      if (!user || !user.id) {
         console.log('⚠️ No hay user.id');
         setLoadingDireccion(false);
         setDireccionCargada(true);
@@ -101,16 +82,13 @@ export default function EnvioPago() {
 
       console.log('🔍 Buscando direcciones del usuario ID:', user.id);
 
-      // ✅ Usar usersService
       const data = await usersService.getDirecciones(user.id);
       
-      // El backend puede devolver un array directamente o un objeto con results
       const direcciones = Array.isArray(data) ? data : (data.results || []);
       
       console.log('📍 Direcciones encontradas:', direcciones);
 
       if (direcciones && direcciones.length > 0) {
-        // Buscar dirección predeterminada o usar la primera
         const direccionPrincipal = direcciones.find(d => d.es_predeterminada) || direcciones[0];
         
         console.log('✅ Dirección seleccionada:', direccionPrincipal);
@@ -140,7 +118,6 @@ export default function EnvioPago() {
 
   const guardarOActualizarDireccion = async () => {
     try {
-      // Determinar provincia y código postal según ciudad
       let provincia = 'Corrientes';
       let codigo_postal = '3400';
       
@@ -162,11 +139,9 @@ export default function EnvioPago() {
       let direccionGuardada;
 
       if (direccionId) {
-        // ✅ Actualizar dirección existente usando usersService
         console.log('🔄 Actualizando dirección:', direccionId);
         direccionGuardada = await usersService.updateDireccion(direccionId, direccionData);
       } else {
-        // ✅ Crear nueva dirección usando usersService
         console.log('➕ Creando nueva dirección');
         direccionGuardada = await usersService.createDireccion(direccionData);
       }
@@ -195,13 +170,12 @@ export default function EnvioPago() {
       const token = getAuthToken();
       const user = getAuthUser();
 
-      if (!token) {
-        alert('Debes iniciar sesión para realizar una compra');
+      if (!token || !user) {
+        alert('Debes iniciar sesión como cliente para realizar una compra');
         navigate('/registro');
         return null;
       }
 
-      // ✅ Variable para guardar el ID de la dirección guardada
       let direccionGuardadaId = null;
 
       if (tipoEntrega === 'envio') {
@@ -216,7 +190,6 @@ export default function EnvioPago() {
           return null;
         }
 
-        // Guardar o actualizar la dirección en la BD
         try {
           const direccionGuardada = await guardarOActualizarDireccion();
           direccionGuardadaId = direccionGuardada.id;
@@ -260,7 +233,6 @@ export default function EnvioPago() {
         estado_pago: 'pendiente'
       };
 
-      // ✅ Agregar direccion_id si es envío
       if (tipoEntrega === 'envio' && direccionGuardadaId) {
         pedidoPayload.direccion_id = direccionGuardadaId;
         
@@ -352,6 +324,11 @@ export default function EnvioPago() {
 
     try {
       const token = getAuthToken();
+      
+      if (!token) {
+        console.error('❌ No hay token de cliente');
+        return;
+      }
       
       let estadoPago = 'pendiente';
       if (result.status === 'approved') {
