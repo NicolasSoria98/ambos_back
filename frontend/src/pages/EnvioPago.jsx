@@ -3,6 +3,7 @@ import PaymentBrick from '../components/PaymentBrick';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import authService from '../services/auth';
+import usersService from '../services/users';
 
 initMercadoPago('TEST-4aa13959-24eb-4a20-8858-fbc57f97deb1');
 
@@ -89,57 +90,49 @@ export default function EnvioPago() {
   const cargarDireccionUsuario = async () => {
     try {
       setLoadingDireccion(true);
-      const token = getAuthToken();
       const user = getAuthUser();
 
-      if (!token || !user.id) {
-        console.log('⚠️ No hay token o user.id');
+      if (!user.id) {
+        console.log('⚠️ No hay user.id');
         setLoadingDireccion(false);
+        setDireccionCargada(true);
         return;
       }
 
       console.log('🔍 Buscando direcciones del usuario ID:', user.id);
 
-      // ✅ Filtrar por usuario en la petición
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/usuarios/direccion/?usuario=${user.id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      // ✅ Usar usersService
+      const data = await usersService.getDirecciones(user.id);
+      
+      // El backend puede devolver un array directamente o un objeto con results
+      const direcciones = Array.isArray(data) ? data : (data.results || []);
+      
+      console.log('📍 Direcciones encontradas:', direcciones);
 
-      if (response.ok) {
-        const data = await response.json();
-        // El backend puede devolver un array directamente o un objeto con results
-        const direcciones = Array.isArray(data) ? data : (data.results || []);
+      if (direcciones && direcciones.length > 0) {
+        // Buscar dirección predeterminada o usar la primera
+        const direccionPrincipal = direcciones.find(d => d.es_predeterminada) || direcciones[0];
         
-        console.log('📍 Direcciones encontradas:', direcciones);
-
-        if (direcciones && direcciones.length > 0) {
-          // Buscar dirección predeterminada o usar la primera
-          const direccionPrincipal = direcciones.find(d => d.es_predeterminada) || direcciones[0];
-          
-          console.log('✅ Dirección seleccionada:', direccionPrincipal);
-          
-          setDireccion({
-            calle: direccionPrincipal.calle || '',
-            numero: direccionPrincipal.numero || '',
-            piso_depto: direccionPrincipal.piso_depto || '',
-            ciudad: direccionPrincipal.ciudad || 'Corrientes',
-            provincia: direccionPrincipal.provincia || 'Corrientes',
-            codigo_postal: direccionPrincipal.codigo_postal || '3400'
-          });
-          
-          setDireccionId(direccionPrincipal.id);
-          setDireccionCargada(true);
-        } else {
-          console.log('ℹ️ Usuario sin direcciones guardadas');
-          setDireccionCargada(true); // Marcar como cargada aunque no haya direcciones
-        }
+        console.log('✅ Dirección seleccionada:', direccionPrincipal);
+        
+        setDireccion({
+          calle: direccionPrincipal.calle || '',
+          numero: direccionPrincipal.numero || '',
+          piso_depto: direccionPrincipal.piso_depto || '',
+          ciudad: direccionPrincipal.ciudad || 'Corrientes',
+          provincia: direccionPrincipal.provincia || 'Corrientes',
+          codigo_postal: direccionPrincipal.codigo_postal || '3400'
+        });
+        
+        setDireccionId(direccionPrincipal.id);
+        setDireccionCargada(true);
       } else {
-        console.error('❌ Error en la respuesta:', response.status);
+        console.log('ℹ️ Usuario sin direcciones guardadas');
+        setDireccionCargada(true);
       }
     } catch (error) {
       console.error('❌ Error cargando dirección:', error);
+      setDireccionCargada(true);
     } finally {
       setLoadingDireccion(false);
     }
@@ -147,8 +140,6 @@ export default function EnvioPago() {
 
   const guardarOActualizarDireccion = async () => {
     try {
-      const token = getAuthToken();
-      
       // Determinar provincia y código postal según ciudad
       let provincia = 'Corrientes';
       let codigo_postal = '3400';
@@ -168,43 +159,23 @@ export default function EnvioPago() {
         es_predeterminada: true
       };
 
-      let response;
+      let direccionGuardada;
 
       if (direccionId) {
-        // Actualizar dirección existente
+        // ✅ Actualizar dirección existente usando usersService
         console.log('🔄 Actualizando dirección:', direccionId);
-        response = await fetch(`${import.meta.env.VITE_API_URL}/usuarios/direccion/${direccionId}/`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(direccionData)
-        });
+        direccionGuardada = await usersService.updateDireccion(direccionId, direccionData);
       } else {
-        // Crear nueva dirección
+        // ✅ Crear nueva dirección usando usersService
         console.log('➕ Creando nueva dirección');
-        response = await fetch(`${import.meta.env.VITE_API_URL}/usuarios/direccion/`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(direccionData)
-        });
+        direccionGuardada = await usersService.createDireccion(direccionData);
       }
 
-      if (response.ok) {
-        const direccionGuardada = await response.json();
-        setDireccionId(direccionGuardada.id);
-        setDireccionCargada(true);
-        console.log('✅ Dirección guardada/actualizada:', direccionGuardada);
-        return direccionGuardada;
-      } else {
-        const errorData = await response.json();
-        console.error('❌ Error al guardar dirección:', errorData);
-        throw new Error('Error al guardar la dirección');
-      }
+      setDireccionId(direccionGuardada.id);
+      setDireccionCargada(true);
+      console.log('✅ Dirección guardada/actualizada:', direccionGuardada);
+      return direccionGuardada;
+
     } catch (error) {
       console.error('❌ Error en guardarOActualizarDireccion:', error);
       throw error;
@@ -230,6 +201,9 @@ export default function EnvioPago() {
         return null;
       }
 
+      // ✅ Variable para guardar el ID de la dirección guardada
+      let direccionGuardadaId = null;
+
       if (tipoEntrega === 'envio') {
         if (!direccion.calle.trim()) {
           alert('Por favor ingresa la calle');
@@ -244,7 +218,9 @@ export default function EnvioPago() {
 
         // Guardar o actualizar la dirección en la BD
         try {
-          await guardarOActualizarDireccion();
+          const direccionGuardada = await guardarOActualizarDireccion();
+          direccionGuardadaId = direccionGuardada.id;
+          console.log('✅ Dirección guardada con ID:', direccionGuardadaId);
         } catch (error) {
           alert('Error al guardar la dirección. Intenta de nuevo.');
           setLoading(false);
@@ -284,7 +260,10 @@ export default function EnvioPago() {
         estado_pago: 'pendiente'
       };
 
-      if (tipoEntrega === 'envio') {
+      // ✅ Agregar direccion_id si es envío
+      if (tipoEntrega === 'envio' && direccionGuardadaId) {
+        pedidoPayload.direccion_id = direccionGuardadaId;
+        
         let provincia = 'Corrientes';
         let codigo_postal = '3400';
         

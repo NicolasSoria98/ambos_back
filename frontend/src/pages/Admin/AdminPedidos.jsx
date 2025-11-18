@@ -104,6 +104,16 @@ export default function AdminPedidos() {
     return estadoObj ? estadoObj.label : estado;
   };
 
+  // ✅ Función para determinar el tipo de envío
+  const getTipoEnvio = (pedido) => {
+    // Si tiene direccion_info, es envío a domicilio
+    if (pedido.direccion_info) {
+      return 'envio';
+    }
+    // Si no tiene dirección, es retiro en local
+    return 'retiro';
+  };
+
   const pedidosFiltrados = pedidos.filter(pedido => {
     const matchSearch = 
       pedido.numero_pedido.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -344,7 +354,10 @@ export default function AdminPedidos() {
               <div className="space-y-4 sm:space-y-6">
                 {/* Información del cliente */}
                 <div className="border-b pb-4">
-                  <h3 className="font-semibold text-base sm:text-lg mb-3">Información del Cliente</h3>
+                  <h3 className="font-semibold text-base sm:text-lg mb-3">
+                    <i className="fas fa-user mr-2 text-indigo-600"></i>
+                    Información del Cliente
+                  </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div>
                       <p className="text-xs sm:text-sm text-gray-600">Nombre</p>
@@ -377,24 +390,78 @@ export default function AdminPedidos() {
                   </div>
                 </div>
 
-                {/* Dirección de envío */}
-                {selectedPedido.direccion_info && (
-                  <div className="border-b pb-4">
-                    <h3 className="font-semibold text-base sm:text-lg mb-3">Dirección de Envío</h3>
-                    <p className="text-gray-700 text-sm sm:text-base">
-                      {selectedPedido.direccion_info.calle} {selectedPedido.direccion_info.numero}
-                      {selectedPedido.direccion_info.piso_depto && `, ${selectedPedido.direccion_info.piso_depto}`}
-                      <br />
-                      {selectedPedido.direccion_info.ciudad}, {selectedPedido.direccion_info.provincia}
-                      <br />
-                      CP: {selectedPedido.direccion_info.codigo_postal}
-                    </p>
+                {/* Información de envío y dirección */}
+                <div className="border-b pb-4">
+                  <h3 className="font-semibold text-base sm:text-lg mb-3">
+                    <i className="fas fa-shipping-fast mr-2 text-indigo-600"></i>
+                    Información de Envío
+                  </h3>
+                  <div className="bg-gray-50 p-3 sm:p-4 rounded-lg space-y-3">
+                    <div>
+                      <p className="text-xs sm:text-sm text-gray-600 mb-1">Tipo de Entrega</p>
+                      <p className="font-medium text-sm sm:text-base">
+                        {/* ✅ Usar getTipoEnvio para determinar el tipo */}
+                        {getTipoEnvio(selectedPedido) === 'envio' ? (
+                          <span className="text-purple-700">
+                            <i className="fas fa-truck mr-1"></i>
+                            Envío a Domicilio
+                          </span>
+                        ) : (
+                          <span className="text-blue-700">
+                            <i className="fas fa-store mr-1"></i>
+                            Retiro en Local
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    
+                    <div>
+                      <p className="text-xs sm:text-sm text-gray-600 mb-1">Costo de Envío</p>
+                      <p className="font-medium text-sm sm:text-base">
+                        ${parseFloat(selectedPedido.costo_envio || 0).toFixed(2)}
+                      </p>
+                    </div>
+
+                    {/* ✅ Mostrar dirección solo si existe direccion_info */}
+                    {selectedPedido.direccion_info && (
+                      <div className="border-t pt-3">
+                        <p className="text-xs sm:text-sm text-gray-600 mb-2 font-semibold">
+                          <i className="fas fa-map-marker-alt mr-1"></i>
+                          Dirección de Entrega
+                        </p>
+                        <div className="text-gray-700 text-sm sm:text-base space-y-1">
+                          <p className="font-medium">
+                            {selectedPedido.direccion_info.calle} {selectedPedido.direccion_info.numero}
+                            {selectedPedido.direccion_info.piso_depto && `, ${selectedPedido.direccion_info.piso_depto}`}
+                          </p>
+                          <p>
+                            {selectedPedido.direccion_info.ciudad}, {selectedPedido.direccion_info.provincia}
+                          </p>
+                          <p className="text-xs sm:text-sm text-gray-600">
+                            Código Postal: {selectedPedido.direccion_info.codigo_postal}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ✅ Mensaje si es retiro en local */}
+                    {!selectedPedido.direccion_info && (
+                      <div className="border-t pt-3">
+                        <p className="text-xs sm:text-sm text-blue-700 font-medium">
+                          <i className="fas fa-info-circle mr-1"></i>
+                          El cliente retirará el pedido en el local
+                        </p>
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
 
                 {/* Items del pedido */}
                 <div className="border-b pb-4">
-                  <h3 className="font-semibold text-base sm:text-lg mb-3">Productos</h3>
+                  <h3 className="font-semibold text-base sm:text-lg mb-3">
+                    <i className="fas fa-box mr-2 text-indigo-600"></i>
+                    Productos ({selectedPedido.items?.length || 0})
+                  </h3>
                   <div className="space-y-2 sm:space-y-3">
                     {selectedPedido.items && selectedPedido.items.map((item, index) => (
                       <div key={index} className="flex flex-col sm:flex-row justify-between items-start bg-gray-50 p-2 sm:p-3 rounded gap-2 sm:gap-0">
@@ -453,8 +520,11 @@ export default function AdminPedidos() {
 
                 {/* Notas */}
                 {selectedPedido.notas && (
-                  <div className="bg-yellow-50 p-3 sm:p-4 rounded">
-                    <h3 className="font-semibold text-sm sm:text-base mb-2">Notas del Pedido</h3>
+                  <div className="bg-yellow-50 p-3 sm:p-4 rounded border border-yellow-200">
+                    <h3 className="font-semibold text-sm sm:text-base mb-2">
+                      <i className="fas fa-sticky-note mr-2 text-yellow-600"></i>
+                      Notas del Pedido
+                    </h3>
                     <p className="text-gray-700 text-xs sm:text-sm">{selectedPedido.notas}</p>
                   </div>
                 )}

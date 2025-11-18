@@ -75,7 +75,6 @@ class UsuarioViewSet(viewsets.ModelViewSet):
             return [AllowAny()]
         if self.action in ['me']:
             return [IsAuthenticated()]
-        # ✅ FIX: Agregar 'cambiar_password' a las acciones permitidas para usuarios autenticados
         if self.action in ['retrieve', 'update', 'partial_update', 'cambiar_password']:
             return [IsAuthenticated()]
         return [IsAuthenticated(), IsAdminUser()]
@@ -372,20 +371,48 @@ class DireccionViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         # Asignar automáticamente el usuario autenticado
         serializer.save(usuario=self.request.user)
+    
     def update(self, request, *args, **kwargs):
-        usuario = self.get_object()
-        if not request.user.is_staff and usuario.id != request.user.id:
+        """
+        Override para verificar que el usuario solo puede editar sus propias direcciones
+        """
+        direccion = self.get_object()
+        
+        # Verificar que la dirección pertenezca al usuario (o sea admin)
+        if not request.user.is_staff and direccion.usuario.id != request.user.id:
             return Response(
-                {'error': 'No tienes permiso para modificar este usuario'},
+                {'error': 'No tienes permiso para modificar esta dirección'},
                 status=status.HTTP_403_FORBIDDEN
             )
+        
         return super().update(request, *args, **kwargs)
 
     def partial_update(self, request, *args, **kwargs):
-        usuario = self.get_object()
-        if not request.user.is_staff and usuario.id != request.user.id:
+        """
+        Override para verificar que el usuario solo puede editar sus propias direcciones
+        """
+        direccion = self.get_object()
+        
+        # Verificar que la dirección pertenezca al usuario (o sea admin)
+        if not request.user.is_staff and direccion.usuario.id != request.user.id:
             return Response(
-                {'error': 'No tienes permiso para modificar este usuario'},
+                {'error': 'No tienes permiso para modificar esta dirección'},
                 status=status.HTTP_403_FORBIDDEN
             )
+        
         return super().partial_update(request, *args, **kwargs)
+    
+    def destroy(self, request, *args, **kwargs):
+        """
+        Override para verificar que el usuario solo puede eliminar sus propias direcciones
+        """
+        direccion = self.get_object()
+        
+        # Verificar que la dirección pertenezca al usuario (o sea admin)
+        if not request.user.is_staff and direccion.usuario.id != request.user.id:
+            return Response(
+                {'error': 'No tienes permiso para eliminar esta dirección'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        return super().destroy(request, *args, **kwargs)

@@ -106,10 +106,22 @@ class CrearPedidoSerializer(serializers.Serializer):
     envio = serializers.DictField(required=False)
     metodo_pago = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     estado_pago = serializers.CharField(required=False, default='pendiente')
+    direccion_id = serializers.IntegerField(required=False, allow_null=True)  # ✅ NUEVO
 
     def validate(self, attrs):
         if not attrs.get('items'):
             raise serializers.ValidationError('items es requerido')
+        
+        # ✅ Validar que la dirección existe si se proporciona
+        direccion_id = attrs.get('direccion_id')
+        if direccion_id:
+            try:
+                Direccion.objects.get(id=direccion_id)
+            except Direccion.DoesNotExist:
+                raise serializers.ValidationError({
+                    'direccion_id': f'Dirección con id {direccion_id} no existe'
+                })
+        
         return attrs
 
     def create(self, validated_data):
@@ -121,8 +133,11 @@ class CrearPedidoSerializer(serializers.Serializer):
         envio = validated_data.get('envio') or {}
         metodo_pago = validated_data.get('metodo_pago', 'mercadopago')
         estado_pago = validated_data.get('estado_pago', 'pendiente')
+        direccion_id = validated_data.get('direccion_id')  # ✅ NUEVO
 
         print(f"📤 Creando pedido con método: {metodo_pago}, estado_pago: {estado_pago}")
+        if direccion_id:
+            print(f"📍 Con direccion_id: {direccion_id}")
 
         with transaction.atomic():
             detalles_items = [] 
@@ -176,10 +191,20 @@ class CrearPedidoSerializer(serializers.Serializer):
             from datetime import datetime
             numero_pedido = datetime.utcnow().strftime('PN%Y%m%d%H%M%S')
 
+            # ✅ Obtener la instancia de Direccion si se proporcionó direccion_id
+            direccion_obj = None
+            if direccion_id:
+                try:
+                    direccion_obj = Direccion.objects.get(id=direccion_id)
+                    print(f"✅ Dirección encontrada: {direccion_obj}")
+                except Direccion.DoesNotExist:
+                    print(f"⚠️ Dirección con ID {direccion_id} no encontrada")
+
             # Crear pedido con estado='en_preparacion', estado_pago='pendiente', metodo_pago
             pedido = Pedido.objects.create(
                 numero_pedido=numero_pedido,
                 usuario=user,
+                direccion=direccion_obj,  # ✅ NUEVO: Asignar la dirección
                 email_contacto=contacto.get('email') or (user.email if user else ''),
                 telefono_contacto=contacto.get('telefono') or '',
                 subtotal=subtotal,
@@ -190,7 +215,7 @@ class CrearPedidoSerializer(serializers.Serializer):
                 metodo_pago=metodo_pago   # efectivo o mercadopago
             )
 
-            print(f"✅ Pedido creado: ID={pedido.id}, estado={pedido.estado}, estado_pago={pedido.estado_pago}, método={pedido.metodo_pago}")
+            print(f"✅ Pedido creado: ID={pedido.id}, estado={pedido.estado}, estado_pago={pedido.estado_pago}, método={pedido.metodo_pago}, direccion_id={pedido.direccion_id if pedido.direccion else None}")
 
             # Crear items y reducir stock
             for producto, variante, cantidad, precio_unitario, sub in detalles_items:
@@ -228,7 +253,6 @@ class CrearPedidoSerializer(serializers.Serializer):
                 print(f"✅ Pago creado en tabla pagos: ID={pago.id}, método={pago.metodo_pago}, estado={pago.estado_pago}")
 
             return pedido
-
 
 class HistorialEstadoPedidoSerializer(serializers.ModelSerializer):
     usuario_modificador_nombre = serializers.SerializerMethodField()
