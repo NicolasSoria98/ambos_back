@@ -127,7 +127,7 @@ export default function AdminInventario() {
         <i className="fas fa-bars text-lg"></i>
       </button>
 
-      <main className="flex-1 p-3 sm:p-6 lg:p-8 lg:ml-0 overflow-x-hidden">
+      <main className="flex-1 p-3 sm:p-6 lg:p-8 lg:ml-0 overflow-x-hidden w-full">
         {/* Header */}
         <div className="mb-4 sm:mb-6 mt-14 lg:mt-0">
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Gestión de Inventario</h1>
@@ -198,9 +198,9 @@ export default function AdminInventario() {
         </div>
 
         {/* Tabla de inventario */}
-        <div className="bg-white shadow-lg rounded-lg overflow-hidden">
+        <div className="bg-white shadow-lg rounded-lg overflow-hidden w-full">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200" style={{ minWidth: '600px' }}>
+            <table className="w-full divide-y divide-gray-200" style={{ minWidth: '600px' }}>
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
