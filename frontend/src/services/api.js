@@ -14,7 +14,17 @@ const api = axios.create({
 // Interceptor para agregar token de autenticación
 api.interceptors.request.use(
   (config) => {
-    // Detectar si la petición es para área de admin basado en la URL y ruta actual
+    // Detectar si es petición de autenticación (login/registro/refresh)
+    const isAuthRequest = config.url?.includes('/auth/login') || 
+                         config.url?.includes('/auth/registro') ||
+                         config.url?.includes('/auth/token/refresh');
+    
+    // Para peticiones de autenticación NO enviar ningún token
+    if (isAuthRequest) {
+      return config;
+    }
+    
+    // Detectar área basado en URL y path actual
     const isAdminUrl = config.url?.includes('/admin');
     const isAdminPath = window.location.pathname.startsWith('/admin');
     
@@ -22,15 +32,15 @@ api.interceptors.request.use(
     const adminToken = localStorage.getItem('admin_authToken');
     const clientToken = localStorage.getItem('client_authToken');
     
-    // ✅ FIX: Lógica mejorada para seleccionar el token correcto
+    // ✅ FIX CRÍTICO: Seleccionar token correcto SIN fallback
     let token = null;
     
     if (isAdminUrl || isAdminPath) {
-      // Área de admin - usar token de admin si existe
+      // Área de admin - SOLO usar token de admin
       token = adminToken;
     } else {
-      // Área de cliente - priorizar token de cliente, pero permitir admin si no hay cliente
-      token = clientToken || adminToken;
+      // Área de cliente - SOLO usar token de cliente (SIN fallback)
+      token = clientToken;
     }
     
     if (token) {
@@ -47,31 +57,84 @@ api.interceptors.request.use(
 // Interceptor para manejar errores
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Token expirado o inválido - detectar área y limpiar sesión apropiada
+  async (error) => {
+    const originalRequest = error.config;
+    
+    // ✅ FIX: Manejar token expirado (401) con refresh automático
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      
       const isAdminArea = window.location.pathname.startsWith('/admin');
       
       if (isAdminArea) {
-        // Limpiar sesión de admin
-        localStorage.removeItem('admin_authToken');
-        localStorage.removeItem('admin_refreshToken');
-        localStorage.removeItem('admin_user');
+        // Intentar refrescar token de admin
+        const refreshToken = localStorage.getItem('admin_refreshToken');
         
-        // Solo redirigir si NO estamos ya en la página de login
-        if (!window.location.pathname.includes('/admin/login')) {
-          window.location.href = '/admin/login';
+        if (refreshToken) {
+          try {
+            const response = await axios.post(`${API_BASE_URL}/auth/token/refresh/`, {
+              refresh: refreshToken
+            });
+            
+            if (response.data.access) {
+              localStorage.setItem('admin_authToken', response.data.access);
+              originalRequest.headers.Authorization = `Bearer ${response.data.access}`;
+              return api(originalRequest);
+            }
+          } catch (refreshError) {
+            console.error('Error al refrescar token admin:', refreshError);
+            // Limpiar sesión de admin
+            localStorage.removeItem('admin_authToken');
+            localStorage.removeItem('admin_refreshToken');
+            localStorage.removeItem('admin_user');
+            
+            if (!window.location.pathname.includes('/admin/login')) {
+              window.location.href = '/admin/login';
+            }
+            return Promise.reject(refreshError);
+          }
+        } else {
+          // No hay refresh token - limpiar sesión
+          localStorage.removeItem('admin_authToken');
+          localStorage.removeItem('admin_refreshToken');
+          localStorage.removeItem('admin_user');
+          
+          if (!window.location.pathname.includes('/admin/login')) {
+            window.location.href = '/admin/login';
+          }
         }
       } else {
-        // Limpiar sesión de cliente
-        localStorage.removeItem('client_authToken');
-        localStorage.removeItem('client_refreshToken');
-        localStorage.removeItem('client_user');
+        // Intentar refrescar token de cliente
+        const refreshToken = localStorage.getItem('client_refreshToken');
         
-        // NO redirigir automáticamente para evitar loops
-        // El componente que reciba el error 401 manejará la redirección
+        if (refreshToken) {
+          try {
+            const response = await axios.post(`${API_BASE_URL}/auth/token/refresh/`, {
+              refresh: refreshToken
+            });
+            
+            if (response.data.access) {
+              localStorage.setItem('client_authToken', response.data.access);
+              originalRequest.headers.Authorization = `Bearer ${response.data.access}`;
+              return api(originalRequest);
+            }
+          } catch (refreshError) {
+            console.error('Error al refrescar token cliente:', refreshError);
+            // Limpiar sesión de cliente
+            localStorage.removeItem('client_authToken');
+            localStorage.removeItem('client_refreshToken');
+            localStorage.removeItem('client_user');
+            return Promise.reject(refreshError);
+          }
+        } else {
+          // No hay refresh token - limpiar sesión
+          localStorage.removeItem('client_authToken');
+          localStorage.removeItem('client_refreshToken');
+          localStorage.removeItem('client_user');
+        }
       }
     }
+    
     return Promise.reject(error);
   }
 );

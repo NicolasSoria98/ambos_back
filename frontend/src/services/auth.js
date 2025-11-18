@@ -3,8 +3,14 @@ import api from './api';
 const authService = {
   // ============ FUNCIONES DE ADMINISTRADOR ============
   
+  // ============ FUNCIONES DE ADMINISTRADOR ============
+  
   loginAdmin: async (email, password) => {
     try {
+      // ✅ FIX: Limpiar TODAS las sesiones antes de login
+      authService.logoutCliente();
+      authService.logoutAdmin();
+      
       const response = await api.post('/auth/login/', {
         email,
         password
@@ -94,6 +100,10 @@ const authService = {
   
   loginCliente: async (email, password) => {
     try {
+      // ✅ FIX: Limpiar TODAS las sesiones antes de login
+      authService.logoutAdmin();
+      authService.logoutCliente();
+      
       const response = await api.post('/auth/login/', {
         email,
         password

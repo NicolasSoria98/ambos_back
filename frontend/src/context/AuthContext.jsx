@@ -67,6 +67,14 @@ export const AuthProvider = ({ children }) => {
     const adminArea = currentPath.startsWith('/admin');
     
     if (adminArea) {
+      // ✅ FIX: Limpiar tokens de cliente al entrar en área admin
+      const hasClientToken = localStorage.getItem('client_authToken');
+      if (hasClientToken) {
+        localStorage.removeItem('client_authToken');
+        localStorage.removeItem('client_refreshToken');
+        localStorage.removeItem('client_user');
+      }
+      
       // Área de admin - cargar sesión de admin
       const authenticated = authService.isAdminAuthenticated();
       const currentUser = authService.getAdminUser();
@@ -88,6 +96,14 @@ export const AuthProvider = ({ children }) => {
         }
       }
     } else {
+      // ✅ FIX: Limpiar tokens de admin al entrar en área cliente
+      const hasAdminToken = localStorage.getItem('admin_authToken');
+      if (hasAdminToken) {
+        localStorage.removeItem('admin_authToken');
+        localStorage.removeItem('admin_refreshToken');
+        localStorage.removeItem('admin_user');
+      }
+      
       // Área de cliente - cargar sesión de cliente
       const authenticated = authService.isClienteAuthenticated();
       const currentUser = authService.getClienteUser();
